@@ -62,6 +62,7 @@ var DataProcess = (function () {
 
     var loadData = async function () {
         var ncFilePath = fileOptions.dataDirectory + fileOptions.dataFile;
+        var uvImageFilePath = fileOptions.dataDirectory + fileOptions.imgDataFile;
         await loadNetCDF(ncFilePath);
 
         return data;
