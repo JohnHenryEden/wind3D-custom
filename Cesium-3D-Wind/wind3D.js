@@ -154,10 +154,6 @@ class Wind3D {
             requestAnimationFrame(animate);
         }
 
-        var spector = new SPECTOR.Spector();
-        spector.displayUI();
-        spector.spyCanvases();
-
         animate();
     }
 }
