@@ -1,4 +1,4 @@
-# 基于Cesium的windy风场可视化
+# 基于Cesium的windy风场可视化, 包含数据获取
 ### 基于3D-Wind-Field [Demo](https://raymanng.github.io/3D-Wind-Field/demo/)修改
 
 ## Q&A
