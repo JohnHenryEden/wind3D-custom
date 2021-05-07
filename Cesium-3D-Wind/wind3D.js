@@ -118,7 +118,8 @@ class Wind3D {
         }
         
         let provider = new Cesium.UrlTemplateImageryProvider({
-            url: 'https://ims.windy.com/ecmwf-hres/2021/05/07/09/257w{z}/{y}/{x}/wind-surface.jpg?reftime=2021050700'
+            url: 'https://ims.windy.com/ecmwf-hres/2021/05/07/09/257w{z}/{y}/{x}/wind-surface.jpg?reftime=2021050700',
+            maximumLevel : 3
         })
         provider.callback = async function(image){
             console.log(image)
