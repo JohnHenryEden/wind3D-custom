@@ -120,7 +120,7 @@ class Wind3D {
         let provider = new Cesium.UrlTemplateImageryProvider({
             url: 'https://ims.windy.com/ecmwf-hres/2021/05/07/09/257w{z}/{y}/{x}/wind-surface.jpg?reftime=2021050700'
         })
-        provider.callback = function(image){
+        provider.callback = async function(image){
             console.log(image)
             let canvas = document.createElement('canvas')
             let ctx = canvas.getContext('2d')
@@ -129,6 +129,8 @@ class Wind3D {
             // 不知道为什么，绘制的图像上下颠倒了，需要颠倒回来
             // 裁切一下，剪掉上面那块
             ctx.scale(1, -1);
+            let heatTileUrl = await loadWindySource({z:1,x:1,y:0})
+            image.src = heatTileUrl;
             ctx.drawImage(image, 0, 0, canvas.width, canvas.height - 8, 0, -canvas.height, canvas.width, canvas.height)
             
             return canvas;
