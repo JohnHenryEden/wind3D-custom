@@ -4,7 +4,7 @@ import os, sys
 import string
 from Naked.toolshed.shell import execute_js
 
-GFS_DATE= "20210506" # 日期
+GFS_DATE= "20210507" # 日期
 GFS_TIME= "00" # 时间
 RES= "1p00" # 分辨率
 leftlon=0
