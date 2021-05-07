@@ -1,6 +1,7 @@
 // the size of UV textures: width = lon, height = lat*lev
 uniform sampler2D U; // eastward wind 
 uniform sampler2D V; // northward wind
+uniform sampler2D u_wind; // northward wind
 uniform sampler2D currentParticlesPosition; // (lon, lat, lev)
 
 uniform vec3 dimension; // (lon, lat, lev)
@@ -54,10 +55,12 @@ float interpolateTexture(sampler2D componentTexture, vec3 lonLatLev) {
     float lat = lonLatLev.y;
     float lev = lonLatLev.z;
 
-    float lon0 = floor(lon / interval.x) * interval.x;
-    float lon1 = lon0 + 1.0 * interval.x;
-    float lat0 = floor(lat / interval.y) * interval.y;
-    float lat1 = lat0 + 1.0 * interval.y;
+    float precisionCoeff = 1.0;
+
+    float lon0 = floor(lon / (interval.x / precisionCoeff)) * (interval.x / precisionCoeff);
+    float lon1 = lon0 + 1.0 * (interval.x / precisionCoeff);
+    float lat0 = floor(lat / (interval.y / precisionCoeff)) * (interval.y / precisionCoeff);
+    float lat1 = lat0 + 1.0 * (interval.y / precisionCoeff);
 
     float lon0_lat0 = getWindComponent(componentTexture, vec3(lon0, lat0, lev));
     float lon1_lat0 = getWindComponent(componentTexture, vec3(lon1, lat0, lev));

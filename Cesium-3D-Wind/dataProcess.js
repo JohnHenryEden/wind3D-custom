@@ -1,6 +1,116 @@
 var DataProcess = (function () {
     var data;
+    var imageMeta;
+    var heatmapImage;
+    var loadUvImageMeta = function(filePath){
+        return new Promise(function (resolve) {
+            var request = new XMLHttpRequest();
+            request.open('GET', filePath);
 
+            request.onload = function () {
+                resolve(JSON.parse(request.response));
+            }
+            request.send();
+        })
+    }
+    var loadUvHeatmapImage = function(filePath){
+        return new Promise(function (resolve) {
+            var img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.src = filePath;
+            img.onload = function () {
+                
+                var imgWidth = img.width;
+                var imgHeight = img.height;
+                var canvas = document.createElement('canvas');
+                canvas.width = imgWidth;
+                canvas.height = imgHeight;
+                var ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+
+                var imageData = ctx.getImageData(0, 1, imgWidth, imgHeight);
+                var paddedData = imageData.data;
+                this.heatmapImage = paddedData;
+                resolve(paddedData);
+            }
+        })
+    }
+    var loadUvImage = function(filePath){
+        return new Promise(function (resolve) {
+            var img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.src = filePath;
+            data = {};
+            data.image = img;
+            img.onload = function () {
+                var imgWidth = img.width;
+                var imgHeight = img.height;
+                var canvas = document.createElement('canvas');
+                canvas.width = imgWidth;
+                canvas.height = imgHeight;
+                var ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+
+                var imageData = ctx.getImageData(0, 1, imgWidth, imgHeight);
+                var paddedData = imageData.data;
+                let unitLon = (parseInt(imageMeta.rightlon) - parseInt(imageMeta.leftlon)) / imgWidth;
+                let lonArray = [];
+                for(let i = 0; i < imgWidth; i++){
+                    lonArray.push(parseInt(imageMeta.leftlon) + (unitLon * i))
+                }
+                lonArray.push(parseInt(imageMeta.rightlon));
+                data.lon = {}
+                data.lon.array = new Float32Array(lonArray);
+                data.lon.min = parseInt(imageMeta.leftlon);
+                data.lon.max = parseInt(imageMeta.rightlon);
+
+                
+                let unitLat = ((parseInt(imageMeta.toplat) + 90) - (parseInt(imageMeta.bottomlat) + 90)) / imgHeight;
+                let latArray = [];
+                for(let i = 0; i < imgHeight; i++){
+                    latArray.push(parseInt(imageMeta.bottomlat) + (unitLat * i))
+                }
+                latArray.push(parseInt(imageMeta.toplat));
+                data.lat = {};
+                data.lat.array = new Float32Array(latArray);
+                data.lat.min = parseInt(imageMeta.bottomlat);
+                data.lat.max = parseInt(imageMeta.toplat);
+                
+                data.lev = {};
+                data.lev.array = new Float32Array([1]);
+                data.lev.min = Math.min(...data.lev.array);
+                data.lev.max = Math.max(...data.lev.array);
+
+                data.U = {};
+                let Umax = parseInt(imageMeta.uMax);
+                let Umin = parseInt(imageMeta.uMin);
+                let Uarray = [];
+                // 逆算转换公式
+                paddedData.forEach((v, i) => {
+                    if(i % 4 === 0){
+                        Uarray.push(((v * (Umax - Umin)) / 255) + Umin)
+                    }
+                })
+                data.U.array = new Float32Array(Uarray);
+                data.U.min = Umin;
+                data.U.max = Umax;
+
+                data.V = {};
+                let Vmax = parseInt(imageMeta.uMax);
+                let Vmin = parseInt(imageMeta.uMin);
+                let Varray = [];
+                paddedData.forEach((v, i) => {
+                    if(i % 4 === 1){
+                        Varray.push(((v * (Vmax - Vmin)) / 255) + Vmin)
+                    }
+                })
+                data.V.array = new Float32Array(Varray);
+                data.V.min = Vmin;
+                data.V.max = Vmax;
+                resolve(data);
+            };
+        });
+    }
     var loadNetCDF = function (filePath) {
         return new Promise(function (resolve) {
             var request = new XMLHttpRequest();
@@ -27,7 +137,6 @@ var DataProcess = (function () {
                 var variables = arrayToMap(NetCDF.variables);
                 var uAttributes = arrayToMap(variables['U'].attributes);
                 var vAttributes = arrayToMap(variables['V'].attributes);
-
                 data.lon = {};
                 data.lon.array = new Float32Array(NetCDF.getDataVariable('lon').flat());
                 data.lon.min = Math.min(...data.lon.array);
@@ -44,15 +153,16 @@ var DataProcess = (function () {
                 data.lev.max = Math.max(...data.lev.array);
 
                 data.U = {};
-                data.U.array = new Float32Array(NetCDF.getDataVariable('U').flat());
+                let Uarray = NetCDF.getDataVariable('U')
+                data.U.array = new Float32Array(Uarray.flat());
                 data.U.min = uAttributes['min'].value;
                 data.U.max = uAttributes['max'].value;
 
                 data.V = {};
-                data.V.array = new Float32Array(NetCDF.getDataVariable('V').flat());
+                let Varray = NetCDF.getDataVariable('V')
+                data.V.array = new Float32Array(Varray.flat());
                 data.V.min = vAttributes['min'].value;
                 data.V.max = vAttributes['max'].value;
-
                 resolve(data);
             };
 
@@ -63,8 +173,10 @@ var DataProcess = (function () {
     var loadData = async function () {
         var ncFilePath = fileOptions.dataDirectory + fileOptions.dataFile;
         var uvImageFilePath = fileOptions.dataDirectory + fileOptions.imgDataFile;
-        await loadNetCDF(ncFilePath);
-
+        var uvImageMetaFilePath = fileOptions.dataDirectory + fileOptions.imgMetaDataFile;
+        // await loadNetCDF(ncFilePath);
+        imageMeta = await loadUvImageMeta(uvImageMetaFilePath);
+        await loadUvImage(uvImageFilePath);
         return data;
     }
 

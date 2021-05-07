@@ -1,5 +1,6 @@
 uniform sampler2D trailsColorTexture;
 uniform sampler2D trailsDepthTexture;
+uniform sampler2D particlesSpeed;
 
 varying vec2 textureCoordinate;
 

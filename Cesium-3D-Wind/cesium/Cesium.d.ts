@@ -597,7 +597,9 @@ export enum WebGLConstants {
     MAX_ELEMENT_INDEX = 36203,
     TEXTURE_IMMUTABLE_LEVELS = 33503,
     MAX_TEXTURE_MAX_ANISOTROPY_EXT = 34047
-}/**
+}
+
+/**
  * A {@link TerrainProvider} that produces terrain geometry by tessellating height maps
 retrieved from Elevation Tiles of an an ArcGIS ImageService.
  * @example
@@ -38851,6 +38853,11 @@ var custom = new Cesium.UrlTemplateImageryProvider({
  */
 export class UrlTemplateImageryProvider {
     constructor(options: UrlTemplateImageryProvider.ConstructorOptions);
+    /**
+     * Callback function to process image, takes one argument which is the image retrieved. Must Return
+    a <code>HTMLImageElement</code> or <code>HTMLCanvasElement</code> object.
+     */
+    callback: ((...params: any[]) => any) | undefined;
     /**
      * The default alpha blending value of this provider, with 0.0 representing fully transparent and
     1.0 representing fully opaque.

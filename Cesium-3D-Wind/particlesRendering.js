@@ -109,9 +109,9 @@ class ParticlesRendering {
 
         return geometry;
     }
-
     createRenderingPrimitives(context, userInput, viewerParameters, particlesComputing) {
         const that = this;
+        this.particlesTextures = window.particlesTextures;
         this.primitives = {
             segments: new CustomPrimitive({
                 commandType: 'Draw',
@@ -233,7 +233,10 @@ class ParticlesRendering {
                     },
                     trailsDepthTexture: function () {
                         return that.framebuffers.nextTrails.depthTexture;
-                    }
+                    },
+                    particlesSpeed: function () {
+                        return that.particlesTextures.particlesSpeed;
+                    },
                 },
                 // prevent Cesium from writing depth because the depth here should be written manually
                 vertexShaderSource: new Cesium.ShaderSource({

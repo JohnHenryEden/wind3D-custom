@@ -77,10 +77,10 @@ class Wind3D {
     setGlobeLayer(userInput) {
         this.viewer.imageryLayers.removeAll();
         this.viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider();
-
         var globeLayer = userInput.globeLayer;
         switch (globeLayer.type) {
             case "NaturalEarthII": {
+                
                 this.viewer.imageryLayers.addImageryProvider(
                     new Cesium.TileMapServiceImageryProvider({
                         url: Cesium.buildModuleUrl('Assets/Textures/NaturalEarthII')
@@ -98,6 +98,16 @@ class Wind3D {
                 }));
                 break;
             }
+            case "UVImage": {
+                this.viewer.imageryLayers.addImageryProvider(new Cesium.WebMapServiceImageryProvider({
+                    url: userInput.WMS_URL,
+                    layers: globeLayer.layer,
+                    parameters: {
+                        ColorScaleRange: globeLayer.ColorScaleRange
+                    }
+                }));
+                break;
+            }
             case "WorldTerrain": {
                 this.viewer.imageryLayers.addImageryProvider(
                     Cesium.createWorldImagery()
@@ -106,6 +116,24 @@ class Wind3D {
                 break;
             }
         }
+        
+        let provider = new Cesium.UrlTemplateImageryProvider({
+            url: 'https://ims.windy.com/ecmwf-hres/2021/05/07/09/257w{z}/{y}/{x}/wind-surface.jpg?reftime=2021050700'
+        })
+        provider.callback = function(image){
+            console.log(image)
+            let canvas = document.createElement('canvas')
+            let ctx = canvas.getContext('2d')
+            canvas.width = image.width
+            canvas.height = image.height
+            // 不知道为什么，绘制的图像上下颠倒了，需要颠倒回来
+            // 裁切一下，剪掉上面那块
+            ctx.scale(1, -1);
+            ctx.drawImage(image, 0, 0, canvas.width, canvas.height - 8, 0, -canvas.height, canvas.width, canvas.height)
+            
+            return canvas;
+        }
+        this.viewer.imageryLayers.addImageryProvider(provider);
     }
 
     setupEventListeners() {

@@ -3,7 +3,9 @@ var demo = Cesium.defaultValue(demo, false);
 const fileOptions = {
     dataDirectory: demo ? 'https://raw.githubusercontent.com/RaymanNg/3D-Wind-Field/master/data/' : '../data/',
     dataFile: "demo.nc",
-    imgDataFile: "gfsdata/undefined.png",
+    imgDataFile: "gfsdata/2021050600.png",
+    heatmapDataFile: "gfsdata/2021050600-heatmap.png",
+    imgMetaDataFile: "gfsdata/2021050600.json",
     glslDirectory: demo ? '../Cesium-3D-Wind/glsl/' : 'glsl/'
 }
 
@@ -13,7 +15,7 @@ const defaultParticleSystemOptions = {
     fadeOpacity: 0.996,
     dropRate: 0.003,
     dropRateBump: 0.01,
-    speedFactor: 1.0,
+    speedFactor: 0.4,
     lineWidth: 4.0
 }
 
@@ -23,6 +25,7 @@ const globeLayers = [
     { name: "WMS:Air Pressure", type: "WMS", layer: "Pressure_surface", ColorScaleRange: '51640,103500' },
     { name: "WMS:Temperature", type: "WMS", layer: "Temperature_surface", ColorScaleRange: '204.1,317.5' },
     { name: "WMS:Wind Speed", type: "WMS", layer: "Wind_speed_gust_surface", ColorScaleRange: '0.1095,35.31' },
+    { name: "UVImage", type: "UVImage"},
     { name: "WorldTerrain", type: "WorldTerrain" }
 ]
 

@@ -8,11 +8,11 @@ class ParticlesComputing {
     createWindTextures(context, data) {
         var windTextureOptions = {
             context: context,
-            width: data.dimensions.lon,
-            height: data.dimensions.lat * data.dimensions.lev,
+            width: data.lon.array.length,
+            height: data.lat.array.length * data.lev.array.length,
             pixelFormat: Cesium.PixelFormat.LUMINANCE,
             pixelDatatype: Cesium.PixelDatatype.FLOAT,
-            flipY: false,
+            flipY: true, // NetCDF数据和图片数据读取的方向不同，图片需要绕赤道轴翻转一下
             sampler: new Cesium.Sampler({
                 // the values of texture will not be interpolated
                 minificationFilter: Cesium.TextureMinificationFilter.NEAREST,
@@ -22,7 +22,8 @@ class ParticlesComputing {
 
         this.windTextures = {
             U: Util.createTexture(windTextureOptions, data.U.array),
-            V: Util.createTexture(windTextureOptions, data.V.array)
+            V: Util.createTexture(windTextureOptions, data.V.array),
+            u_wind: Util.createGlTexture(context._gl, context._gl.LINEAR, data.image)
         };
     }
 
@@ -52,6 +53,7 @@ class ParticlesComputing {
 
             particlesSpeed: Util.createTexture(particlesTextureOptions, zeroArray)
         };
+        window.particlesTextures = this.particlesTextures;
     }
 
     destroyParticlesTextures() {
@@ -61,7 +63,7 @@ class ParticlesComputing {
     }
 
     createComputingPrimitives(data, userInput, viewerParameters) {
-        const dimension = new Cesium.Cartesian3(data.dimensions.lon, data.dimensions.lat, data.dimensions.lev);
+        const dimension = new Cesium.Cartesian3(data.lon.array.length, data.lat.array.length, data.lev.array.length);
         const minimum = new Cesium.Cartesian3(data.lon.min, data.lat.min, data.lev.min);
         const maximum = new Cesium.Cartesian3(data.lon.max, data.lat.max, data.lev.max);
         const interval = new Cesium.Cartesian3(
@@ -83,6 +85,9 @@ class ParticlesComputing {
                     },
                     V: function () {
                         return that.windTextures.V;
+                    },
+                    u_wind: function () {
+                        return that.windTextures.u_wind;
                     },
                     currentParticlesPosition: function () {
                         return that.particlesTextures.currentParticlesPosition;
