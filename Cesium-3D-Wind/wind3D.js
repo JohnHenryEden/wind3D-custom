@@ -5,7 +5,8 @@ class Wind3D {
             geocoder: false,
             infoBox: false,
             fullscreenElement: 'cesiumContainer',
-            scene3DOnly: true
+            scene3DOnly: true,
+	        // sceneMode: Cesium.SceneMode.COLUMBUS_VIEW // 2.5D模式
         }
 
         if (mode.debug) {
@@ -80,7 +81,7 @@ class Wind3D {
         var globeLayer = userInput.globeLayer;
         switch (globeLayer.type) {
             case "NaturalEarthII": {
-                
+
                 this.viewer.imageryLayers.addImageryProvider(
                     new Cesium.TileMapServiceImageryProvider({
                         url: Cesium.buildModuleUrl('Assets/Textures/NaturalEarthII')
@@ -116,12 +117,25 @@ class Wind3D {
                 break;
             }
         }
-        
+
         let provider = new Cesium.UrlTemplateImageryProvider({
-            url: 'https://ims.windy.com/ecmwf-hres/2021/05/07/09/257w{z}/{y}/{x}/wind-surface.jpg?reftime=2021050700',
-            maximumLevel : 3
+            url: 'https://ims.windy.com/im/v3.0/forecast/cmems/2021051112/2021051113/wm_grid_257/{zTile}/{xTile}/{yTile}/seacurrents-surface.jpg',
+            customTags: {
+                zTile: function (imageryProvider, x, y, level) {
+                    var originZ =  caculateOriginTileZ(level,x,y);
+                    return originZ;
+                },
+                xTile: function (imageryProvider, x, y, level) {
+                    var originX =  caculateOriginTileX(level,x,y);
+                    return originX;
+                },
+                yTile: function (imageryProvider, x, y, level) {
+                    var originY =  caculateOriginTileY(level,x,y);
+                    return originY;
+                },
+            }
         })
-        provider.callback = async function(image){
+        provider.callback = function (image, x, y, level) {
             console.log(image)
             let canvas = document.createElement('canvas')
             let ctx = canvas.getContext('2d')
@@ -130,13 +144,61 @@ class Wind3D {
             // 不知道为什么，绘制的图像上下颠倒了，需要颠倒回来
             // 裁切一下，剪掉上面那块
             ctx.scale(1, -1);
-            let heatTileUrl = await loadWindySource({z:1,x:1,y:0})
-            image.src = heatTileUrl;
-            ctx.drawImage(image, 0, 0, canvas.width, canvas.height - 8, 0, -canvas.height, canvas.width, canvas.height)
-            
-            return canvas;
+            ctx.drawImage(image, 0, 0, canvas.width, canvas.height, 0, -canvas.height, canvas.width, canvas.height)
+            // return canvas;
+            let heatTileCanvas = loadWindySource(canvas, image, { z: level, x: x, y: y })
+            return heatTileCanvas;
         }
         this.viewer.imageryLayers.addImageryProvider(provider);
+
+        // 加载windy陆地底图
+        var windyLandLayer_test = new Cesium.ImageryLayer(new Cesium.UrlTemplateImageryProvider({
+            // url : "http://172.17.6.23:9001/services/dpBaseMap/_alllayers/{zTile}/{y}/{x}.png",
+            url: "https://tiles.windy.com/tiles/v9.0/grayland/{z}/{x}/{y}.png",
+        }), {
+            show: true
+        });
+        windyLandLayer_test.alpha = 0.8;
+        this.viewer.imageryLayers.add(windyLandLayer_test);
+        
+        // 加载windy陆地轮廓底图
+        var windyLandLineLayer_test = new Cesium.ImageryLayer(new Cesium.UrlTemplateImageryProvider({
+            url: "https://tiles.windy.com/tiles/v10.0/darkmap/{z}/{x}/{y}.png",
+            customTags: {
+                zTile: function (imageryProvider, x, y, level) {
+                    return level;
+                },
+                xTile: function (imageryProvider, x, y, level) {
+                    return x;
+                },
+                yTile: function (imageryProvider, x, y, level) {
+                    return y;
+                },
+            }
+        }), {
+            show: true
+        });
+        this.viewer.imageryLayers.add(windyLandLineLayer_test);
+        // 场景的日照效果
+        this.scene.globe.enableLighting = false;
+        // this.scene.globe.globeAlpha = 0.001;
+        // this.scene.globe.baseColor = Cesium.Color.fromCssColorString('#0f2935').withAlpha(0.5);//#012855 // 没有影像时地球的基础颜色，默认为蓝色
+        // this.scene.requestRenderMode = true;
+        // 贴地遮盖开启(深度检测)
+        this.scene.globe.depthTestAgainstTerrain = true;
+        // 关闭大气层
+        this.scene.globe.showGroundAtmosphere = false;
+        this.scene.skyAtmosphere.show = true;
+        this.scene.fog.enabled = true;
+        this.scene.fog.density = 0.00005;// 地面 0.00005 海底0.00008
+        this.scene.fog.minimumBrightness = 0.03; // 0.03
+        this.scene._hdr = false;
+        var skyAtmosphere = this.scene.skyAtmosphere;
+        this.scene.globe.showGroundAtmosphere = false;
+
+        skyAtmosphere.hueShift = 0.0;
+        skyAtmosphere.saturationShift = 0.1;
+        skyAtmosphere.brightnessShift = 0.08; // 地面0.08 海底
     }
 
     setupEventListeners() {
