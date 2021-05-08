@@ -119,20 +119,12 @@ class Wind3D {
         }
 
         let provider = new Cesium.UrlTemplateImageryProvider({
-            url: 'https://ims.windy.com/im/v3.0/forecast/cmems/2021051112/2021051113/wm_grid_257/{zTile}/{xTile}/{yTile}/seacurrents-surface.jpg',
+            url: 'https://ims.windy.com/im/v3.0/forecast/cmems/2021051112/2021051113/wm_grid_257/{originTilezxy}/seacurrents-surface.jpg',
             customTags: {
-                zTile: function (imageryProvider, x, y, level) {
-                    var originZ =  caculateOriginTileZ(level,x,y);
-                    return originZ;
-                },
-                xTile: function (imageryProvider, x, y, level) {
-                    var originX =  caculateOriginTileX(level,x,y);
-                    return originX;
-                },
-                yTile: function (imageryProvider, x, y, level) {
-                    var originY =  caculateOriginTileY(level,x,y);
-                    return originY;
-                },
+                originTilezxy: function (imageryProvider, x, y, level) {
+                    var originTile =  caculateOriginTile(level,x,y);
+                    return originTile.z + "/" + originTile.x + "/" + originTile.y;
+                }
             }
         })
         provider.callback = function (image, x, y, level) {
@@ -145,7 +137,7 @@ class Wind3D {
             // 裁切一下，剪掉上面那块
             ctx.scale(1, -1);
             ctx.drawImage(image, 0, 0, canvas.width, canvas.height, 0, -canvas.height, canvas.width, canvas.height)
-            // return canvas;
+            // 原始jpg转换成热力图canvas
             let heatTileCanvas = loadWindySource(canvas, image, { z: level, x: x, y: y })
             return heatTileCanvas;
         }
@@ -153,28 +145,16 @@ class Wind3D {
 
         // 加载windy陆地底图
         var windyLandLayer_test = new Cesium.ImageryLayer(new Cesium.UrlTemplateImageryProvider({
-            // url : "http://172.17.6.23:9001/services/dpBaseMap/_alllayers/{zTile}/{y}/{x}.png",
             url: "https://tiles.windy.com/tiles/v9.0/grayland/{z}/{x}/{y}.png",
         }), {
             show: true
         });
-        windyLandLayer_test.alpha = 0.8;
+        windyLandLayer_test.alpha = 1.0;
         this.viewer.imageryLayers.add(windyLandLayer_test);
         
         // 加载windy陆地轮廓底图
         var windyLandLineLayer_test = new Cesium.ImageryLayer(new Cesium.UrlTemplateImageryProvider({
             url: "https://tiles.windy.com/tiles/v10.0/darkmap/{z}/{x}/{y}.png",
-            customTags: {
-                zTile: function (imageryProvider, x, y, level) {
-                    return level;
-                },
-                xTile: function (imageryProvider, x, y, level) {
-                    return x;
-                },
-                yTile: function (imageryProvider, x, y, level) {
-                    return y;
-                },
-            }
         }), {
             show: true
         });

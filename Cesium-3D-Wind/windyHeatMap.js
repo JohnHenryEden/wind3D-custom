@@ -191,39 +191,22 @@ var render = function () {
         t
 }
 var caculateRender = new render();
-function caculateOriginTileZ(z,x,y){
+// 计算生成windy 洋流热力图 的jpg 数据源的zxy
+function caculateOriginTile(z,x,y){
     var witchTile = caculateRender.whichTile({ z: z, x: x, y: y }, heatMapParams);
-    return witchTile.z;
-}
-function caculateOriginTileX(z,x,y){
-    var witchTile = caculateRender.whichTile({ z: z, x: x, y: y }, heatMapParams);
-    return witchTile.x;
-}
-function caculateOriginTileY(z,x,y){
-    var witchTile = caculateRender.whichTile({ z: z, x: x, y: y }, heatMapParams);
-    return witchTile.y;
+    return witchTile;
 }
 
+// 解析windy jpg到热力图canvas的过程
 function loadWindySource(heatMapCanvas,c, zxy) {
     var heatTileUrl = "";
     renderObj = new render();
     var witchTile = renderObj.whichTile({ z: zxy.z, x: zxy.x, y: zxy.y }, heatMapParams);
     var parseSoure = new JpgSource();
-    parseSoure.url = witchTile.url;
     parseSoure.status = "loading";
-    // var c = new Image;
-    // c.crossOrigin = "Anonymous",
-    // c.onload = function () {
-    // var HeatMapCanvas = document.createElement("canvas");
     var l = heatMapCanvas.getContext("2d");
-    // HeatMapCanvas.width = c.width,
-    // HeatMapCanvas.height = c.height,
-    // l.drawImage(c, 0, 0, c.width, c.height);
-    
-    // var l = originCanvas.getContext("2d");
     var n = l.getImageData(0, 0, c.width, c.height);
-    parseSoure.data = n.data,
-        parseSoure.status = "loaded";
+    parseSoure.data = n.data;
     var i = function (e, t) {
         var n, i, s, a, r = new ArrayBuffer(28), o = new Uint8Array(r), l = new Float32Array(r), c = 4 * t * 4 + 8;
         for (a = 0; a < 28; a++)
@@ -267,19 +250,6 @@ function loadWindySource(heatMapCanvas,c, zxy) {
         a = 0;
     var resultHeatCanvas = transformSoureToHeatMap(parseSoure, witchTile);
     return resultHeatCanvas;
-    // heatTileUrl = resultHeatCanvas.toDataURL("image/png");
-    // var heatImage = new Image();
-    // heatImage.src = resultHeatCanvas.toDataURL("image/png");
-    // console.log('11111')
-    // resolve(heatTileUrl);
-    // }
-    // c.onerror = function () {
-    //     reject('img onload error')
-    // }
-    // c.src = parseSoure.url;
-    // })
-    // requestHeat = await requestHeat;
-    // return await requestHeat;
 }
 var witchTile = {
     intX: 0,
@@ -288,16 +258,15 @@ var witchTile = {
     transformB: null,
     transformG: null,
     transformR: null,
-    url: "https://ims.windy.com/im/v3.0/forecast/cmems/2021051112/2021051113/wm_grid_257/2/3/1/seacurrents-surface.jpg",
-    x: 3,
-    y: 1,
-    z: 2,
+    x: 0,
+    y: 0,
+    z: 0,
 }
 var heatMapParams = {
     JPGtransparency: true,
     PNGtransparency: false,
     acTime: "next3d",
-    dataQuality: "normal",
+    dataQuality: "ultra",
     directory: "forecast/cmems",
     fileSuffix: "jpg",
     filename: "seacurrents",
