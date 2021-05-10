@@ -235,7 +235,7 @@ var oceanHeatMapParams = {
 var hourCount = 1;
 // 预报天数计数器
 var dayNum = 0;
-// 定时器每3s切换一次从今天晚上9点到3天后晚上8点之间每小时的洋流预报热力图
+// 定时器每3s切换一次从当天晚上21点到3天后晚上20点之间每小时的洋流预报热力图
 var startPlayForcast = setInterval(function () {
     hourCount++
     forcastHour = forcastHour + 1
@@ -247,6 +247,7 @@ var startPlayForcast = setInterval(function () {
         forcastHour = 0;
     }
     if (hourCount > 72) {
+        // 完成3天预报后，重新从当天晚上21点循环进行预报
         hourCount = 1;
         dayNum = 0;
         forcastDay = (today.getDate() + dayNum) >= 10 ? today.getDate() + dayNum : "0" + (today.getDate() + dayNum)
