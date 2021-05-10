@@ -1,7 +1,6 @@
 var DataProcess = (function () {
     var data;
     var imageMeta;
-    var heatmapImage;
     var loadUvImageMeta = function(filePath){
         return new Promise(function (resolve) {
             var request = new XMLHttpRequest();
@@ -81,102 +80,24 @@ var DataProcess = (function () {
                 data.lev.min = Math.min(...data.lev.array);
                 data.lev.max = Math.max(...data.lev.array);
 
-                data.U = {};
-                let Umax = parseInt(imageMeta.uMax);
-                let Umin = parseInt(imageMeta.uMin);
-                let Uarray = [];
-                // 逆算转换公式
-                paddedData.forEach((v, i) => {
-                    if(i % 4 === 0){
-                        Uarray.push(((v * (Umax - Umin)) / 255) + Umin)
-                    }
-                })
-                data.U.array = new Float32Array(Uarray);
-                data.U.min = Umin;
-                data.U.max = Umax;
-
-                data.V = {};
-                let Vmax = parseInt(imageMeta.uMax);
-                let Vmin = parseInt(imageMeta.uMin);
-                let Varray = [];
-                paddedData.forEach((v, i) => {
-                    if(i % 4 === 1){
-                        Varray.push(((v * (Vmax - Vmin)) / 255) + Vmin)
-                    }
-                })
-                data.V.array = new Float32Array(Varray);
-                data.V.min = Vmin;
-                data.V.max = Vmax;
+                data.image = {};
+                data.image.data = new Uint8Array(paddedData);;
                 resolve(data);
             };
         });
     }
-    var loadNetCDF = function (filePath) {
-        return new Promise(function (resolve) {
-            var request = new XMLHttpRequest();
-            request.open('GET', filePath);
-            request.responseType = 'arraybuffer';
 
-            request.onload = function () {
-                var arrayToMap = function (array) {
-                    return array.reduce(function (map, object) {
-                        map[object.name] = object;
-                        return map;
-                    }, {});
-                }
-
-                var NetCDF = new netcdfjs(request.response);
-                data = {};
-
-                var dimensions = arrayToMap(NetCDF.dimensions);
-                data.dimensions = {};
-                data.dimensions.lon = dimensions['lon'].size;
-                data.dimensions.lat = dimensions['lat'].size;
-                data.dimensions.lev = dimensions['lev'].size;
-
-                var variables = arrayToMap(NetCDF.variables);
-                var uAttributes = arrayToMap(variables['U'].attributes);
-                var vAttributes = arrayToMap(variables['V'].attributes);
-                data.lon = {};
-                data.lon.array = new Float32Array(NetCDF.getDataVariable('lon').flat());
-                data.lon.min = Math.min(...data.lon.array);
-                data.lon.max = Math.max(...data.lon.array);
-
-                data.lat = {};
-                data.lat.array = new Float32Array(NetCDF.getDataVariable('lat').flat());
-                data.lat.min = Math.min(...data.lat.array);
-                data.lat.max = Math.max(...data.lat.array);
-
-                data.lev = {};
-                data.lev.array = new Float32Array(NetCDF.getDataVariable('lev').flat());
-                data.lev.min = Math.min(...data.lev.array);
-                data.lev.max = Math.max(...data.lev.array);
-
-                data.U = {};
-                let Uarray = NetCDF.getDataVariable('U')
-                data.U.array = new Float32Array(Uarray.flat());
-                data.U.min = uAttributes['min'].value;
-                data.U.max = uAttributes['max'].value;
-
-                data.V = {};
-                let Varray = NetCDF.getDataVariable('V')
-                data.V.array = new Float32Array(Varray.flat());
-                data.V.min = vAttributes['min'].value;
-                data.V.max = vAttributes['max'].value;
-                resolve(data);
-            };
-
-            request.send();
-        });
-    }
-
-    var loadData = async function () {
+    var loadData = async function (image) {
         var ncFilePath = fileOptions.dataDirectory + fileOptions.dataFile;
         var uvImageFilePath = fileOptions.dataDirectory + fileOptions.imgDataFile;
         var uvImageMetaFilePath = fileOptions.dataDirectory + fileOptions.imgMetaDataFile;
         // await loadNetCDF(ncFilePath);
         imageMeta = await loadUvImageMeta(uvImageMetaFilePath);
-        await loadUvImage(uvImageFilePath);
+        if(image){
+            await loadUvImage(image);
+        }else {
+            await loadUvImage(uvImageFilePath);
+        }
         return data;
     }
 

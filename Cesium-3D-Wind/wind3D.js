@@ -28,18 +28,6 @@ class Wind3D {
         this.globeBoundingSphere = new Cesium.BoundingSphere(Cesium.Cartesian3.ZERO, 0.99 * 6378137.0);
         this.updateViewerParameters();
 
-        DataProcess.loadData().then(
-            (data) => {
-                this.particleSystem = new ParticleSystem(this.scene.context, data,
-                    this.panel.getUserInput(), this.viewerParameters);
-                this.addPrimitives();
-
-                this.setupEventListeners();
-
-                if (mode.debug) {
-                    this.debug();
-                }
-            });
 
         this.imageryLayers = this.viewer.imageryLayers;
         this.setGlobeLayer(this.panel.getUserInput());
@@ -118,8 +106,10 @@ class Wind3D {
             }
         }
 
+        let windyUrl = 'https://ims.windy.com/im/v3.0/forecast/cmems/2021051112/2021051113/wm_grid_257/{originTilezxy}/seacurrents-surface.jpg';
+        let that = this;
         let provider = new Cesium.UrlTemplateImageryProvider({
-            url: 'https://ims.windy.com/im/v3.0/forecast/cmems/2021051112/2021051113/wm_grid_257/{originTilezxy}/seacurrents-surface.jpg',
+            url: windyUrl,
             customTags: {
                 originTilezxy: function (imageryProvider, x, y, level) {
                     var originTile =  caculateOriginTile(level,x,y);
@@ -128,7 +118,6 @@ class Wind3D {
             }
         })
         provider.callback = function (image, x, y, level) {
-            console.log(image)
             let canvas = document.createElement('canvas')
             let ctx = canvas.getContext('2d')
             canvas.width = image.width
@@ -143,27 +132,50 @@ class Wind3D {
         }
         this.viewer.imageryLayers.addImageryProvider(provider);
 
+
+        let entireMapCanvas = document.createElement('canvas');
+        let ctx = entireMapCanvas.getContext('2d');
+        let imgnw = new Image();
+        imgnw.crossOrigin = 'anonymous'
+        imgnw.src = windyUrl.replace('{originTilezxy}', '0/0/0')
+
+        imgnw.onload = function(){
+            entireMapCanvas.width = imgnw.width
+            entireMapCanvas.height = imgnw.height - 8
+            ctx.drawImage(imgnw, 0, 8, imgnw.width, imgnw.height - 8, 0, 0, imgnw.width, imgnw.height)
+            let url = entireMapCanvas.toDataURL()
+            
+            DataProcess.loadData(url).then(
+                (data) => {
+                    that.particleSystem = new ParticleSystem(that.scene.context, data,
+                        that.panel.getUserInput(), that.viewerParameters);
+                    that.addPrimitives();
+
+                    that.setupEventListeners();
+
+                    if (mode.debug) {
+                        that.debug();
+                    }
+                });
+        }
         // 加载windy陆地底图
-        var windyLandLayer_test = new Cesium.ImageryLayer(new Cesium.UrlTemplateImageryProvider({
-            url: "https://tiles.windy.com/tiles/v9.0/grayland/{z}/{x}/{y}.png",
-        }), {
-            show: true
-        });
-        windyLandLayer_test.alpha = 1.0;
-        this.viewer.imageryLayers.add(windyLandLayer_test);
+        // var windyLandLayer_test = new Cesium.ImageryLayer(new Cesium.UrlTemplateImageryProvider({
+        //     url: "https://tiles.windy.com/tiles/v9.0/grayland/{z}/{x}/{y}.png",
+        // }), {
+        //     show: true
+        // });
+        // windyLandLayer_test.alpha = 1.0;
+        // this.viewer.imageryLayers.add(windyLandLayer_test);
         
-        // 加载windy陆地轮廓底图
-        var windyLandLineLayer_test = new Cesium.ImageryLayer(new Cesium.UrlTemplateImageryProvider({
-            url: "https://tiles.windy.com/tiles/v10.0/darkmap/{z}/{x}/{y}.png",
-        }), {
-            show: true
-        });
-        this.viewer.imageryLayers.add(windyLandLineLayer_test);
+        // // 加载windy陆地轮廓底图
+        // var windyLandLineLayer_test = new Cesium.ImageryLayer(new Cesium.UrlTemplateImageryProvider({
+        //     url: "https://tiles.windy.com/tiles/v10.0/darkmap/{z}/{x}/{y}.png",
+        // }), {
+        //     show: true
+        // });
+        // this.viewer.imageryLayers.add(windyLandLineLayer_test);
         // 场景的日照效果
         this.scene.globe.enableLighting = false;
-        // this.scene.globe.globeAlpha = 0.001;
-        // this.scene.globe.baseColor = Cesium.Color.fromCssColorString('#0f2935').withAlpha(0.5);//#012855 // 没有影像时地球的基础颜色，默认为蓝色
-        // this.scene.requestRenderMode = true;
         // 贴地遮盖开启(深度检测)
         this.scene.globe.depthTestAgainstTerrain = true;
         // 关闭大气层
