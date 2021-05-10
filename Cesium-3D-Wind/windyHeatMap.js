@@ -190,15 +190,89 @@ var render = function () {
         ,
         t
 }
+
+var today = new Date();
+var year = today.getFullYear();
+var month = (today.getMonth() + 1) >= 10 ? today.getMonth() + 1 : "0" + (today.getMonth() + 1)
+var forcastDay = today.getDate() >= 10 ? today.getDate() : "0" + today.getDate()
+// 预报日期
+var forcastDate = year + "" + month + "" + forcastDay;
+//初始化从预报时间点后1个小时开始
+var nextHourtip = 1; 
+// 预报时间点，开始预报时间点为，晚上20点后1个小时，UTC12点=中国晚上20点
+var forcastHour = (12 + nextHourtip);
+// 洋流预报数据解析参数
+var oceanHeatMapParams = {
+    JPGtransparency: true,
+    PNGtransparency: false,
+    acTime: forcastDate + forcastHour, // 预报时间，晚上20点后一小时一个预报，预报3天后数据,传参用UTC时间(比中国时间少8个小时)
+    dataQuality: "normal",
+    directory: "forecast/cmems",
+    fileSuffix: "jpg",
+    filename: "seacurrents",
+    // fullPath: "https://ims.windy.com/im/v3.0/forecast/cmems/2021051112/2021051113/wm_grid_257/<z>/<x>/<y>/seacurrents-surface.jpg",
+    fullPath: "https://ims.windy.com/im/v3.0/{directory}/{refTime}/{acTime}/wm_grid_257/<z>/<x>/<y>/seacurrents-surface.jpg",
+    hasMoreLevels: false,
+    imVersion: 3,
+    isolines: "off",
+    layer: "currents",
+    level: "surface",
+    maxTileZoom: 3,
+    overlay: "currents",
+    path: "2021042607",
+    product: "cmems",
+    refTime: forcastDate + "12", // 预报开始时间,中国时间第二天的晚上20点,传参用UTC时间(比中国时间少8个小时)
+    renderFrom: "RG",
+    sea: true,
+    server: "https://ims.windy.com",
+    transformB: null,
+    transformG: null,
+    transformR: null,
+    upgradeDataQuality: false,
+}
+
+// 预报小时数计数器，最大72小时
+var hourCount = 1;
+// 预报天数计数器
+var dayNum = 0;
+// 定时器每3s切换一次从今天晚上9点到3天后晚上8点之间每小时的洋流预报热力图
+var startPlayForcast = setInterval(function () {
+    hourCount++
+    forcastHour = forcastHour + 1
+    // 计算预报天数，0-23点为一天时长，超过23点进入下一天0点
+    dayNum = dayNum + parseInt(forcastHour / 24)
+    if (parseInt(forcastHour / 24) >= 1) {
+        // 当时间点到了晚上23点后，时间点应变为第二天0点开始
+        forcastDay = (today.getDate() + dayNum) >= 10 ? today.getDate() + dayNum : "0" + (today.getDate() + dayNum)
+        forcastHour = 0;
+    }
+    if (hourCount > 72) {
+        hourCount = 1;
+        dayNum = 0;
+        forcastDay = (today.getDate() + dayNum) >= 10 ? today.getDate() + dayNum : "0" + (today.getDate() + dayNum)
+    }
+    // 预报时间点完整年月日
+    forcastDate = year + "" + month + "" + forcastDay
+    let forcastHourStr = forcastHour >= 10 ? forcastHour : "0" + forcastHour
+    oceanHeatMapParams.acTime = forcastDate + forcastHourStr;
+    wind3D.setOceanWindyData();
+}, 3000)
+
+// 定时器每10s清除一次旧的洋流热力图图层
+var clearOldOceanWindyLayer = setInterval(function () {
+    wind3D.clearOldOceanWindyLayer()
+}, 10000)
+
+
 var caculateRender = new render();
 // 计算生成windy 洋流热力图 的jpg 数据源的zxy
-function caculateOriginTile(z,x,y){
+function caculateOriginTile(z, x, y) {
     var witchTile = caculateRender.whichTile({ z: z, x: x, y: y }, oceanHeatMapParams);
     return witchTile;
 }
 
 // 解析windy jpg到热力图canvas的过程
-function loadWindySource(heatMapCanvas,c, zxy) {
+function loadWindySource(heatMapCanvas, c, zxy) {
     var heatTileUrl = "";
     renderObj = new render();
     var witchTile = renderObj.whichTile({ z: zxy.z, x: zxy.x, y: zxy.y }, oceanHeatMapParams);
@@ -251,64 +325,13 @@ function loadWindySource(heatMapCanvas,c, zxy) {
     var resultHeatCanvas = transformSoureToHeatMap(parseSoure, witchTile);
     return resultHeatCanvas;
 }
-var witchTile = {
-    intX: 0,
-    intY: 0,
-    trans: 2,
-    transformB: null,
-    transformG: null,
-    transformR: null,
-    x: 0,
-    y: 0,
-    z: 0,
-}
-var today = new Date();
-var year = today.getFullYear();
-var month = (today.getMonth()+1) > 10 ? today.getMonth()+1 : "0" + (today.getMonth()+1)
-var nextDay = (today.getDay()+3) > 10 ? today.getDay()+3 : "0" + (today.getDay()+3)
-var nextDate =year +""+ month +""+ nextDay;
-var nextHourtip = 1; //初始化从预报时间点后1个小时开始
-var oceanHeatMapParams = {
-    JPGtransparency: true,
-    PNGtransparency: false,
-    acTime: nextDate + (12 + nextHourtip), // 预报时间，晚上20点后一小时一个预报，预报3天后数据,传参用UTC时间(比中国时间少8个小时)
-    dataQuality: "ultra",
-    directory: "forecast/cmems",
-    fileSuffix: "jpg",
-    filename: "seacurrents",
-    // fullPath: "https://ims.windy.com/im/v3.0/forecast/cmems/2021051112/2021051113/wm_grid_257/<z>/<x>/<y>/seacurrents-surface.jpg",
-    fullPath: "https://ims.windy.com/im/v3.0/{directory}/{refTime}/{acTime}/wm_grid_257/<z>/<x>/<y>/seacurrents-surface.jpg",
-    hasMoreLevels: false,
-    imVersion: 3,
-    isolines: "off",
-    layer: "currents",
-    level: "surface",
-    maxTileZoom: 3,
-    overlay: "currents",
-    path: "2021042607",
-    product: "cmems",
-    refTime: nextDate + "12", // 预报开始时间,中国时间第二天的晚上20点,传参用UTC时间(比中国时间少8个小时)
-    renderFrom: "RG",
-    sea: true,
-    server: "https://ims.windy.com",
-    transformB: null,
-    transformG: null,
-    transformR: null,
-    upgradeDataQuality: false,
-}
 
-
-var startPlayForcast = setInterval(function(){
-    if (nextHourtip >= 11){
-        nextHourtip = 0;
-    }else{
-        nextHourtip++;
-        var nextHour = (12 + nextHourtip);
-        oceanHeatMapParams.acTime = nextDate + nextHour;
-        wind3D.setOceanWindyData();
-    }
-},3000)
-
+/**
+ * jpg imagedata解析热力图canvas
+ * @param {*} r 解析jpg数据源imagedata 
+ * @param {*} a 转化热力图切片参数对象witchTile
+ * @returns canvas
+ */
 function transformSoureToHeatMap(r, a) {
     var n = 2;
     var o, l = oceanHeatMapParams, c = l.isMultiColor, d = r.data, h = renderObj.imgData.data;

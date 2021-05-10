@@ -1,4 +1,5 @@
 class Wind3D {
+    OceanWindyLayers = []
     constructor(panel, mode) {
         var options = {
             baseLayerPicker: false,
@@ -6,7 +7,7 @@ class Wind3D {
             infoBox: false,
             fullscreenElement: 'cesiumContainer',
             scene3DOnly: true,
-	        // sceneMode: Cesium.SceneMode.COLUMBUS_VIEW // 2.5D模式
+            // sceneMode: Cesium.SceneMode.COLUMBUS_VIEW // 2.5D模式
         }
 
         if (mode.debug) {
@@ -122,19 +123,19 @@ class Wind3D {
             url: 'https://ims.windy.com/im/v3.0/{directory}/{refTime}/{acTime}/wm_grid_257/{originTilezxy}/seacurrents-surface.jpg',
             customTags: {
                 directory: function (imageryProvider, x, y, level) {
-                    var directory =  oceanHeatMapParams.directory;
+                    var directory = oceanHeatMapParams.directory;
                     return directory;
                 },
                 refTime: function (imageryProvider, x, y, level) {
-                    var refTime =  oceanHeatMapParams.refTime;
+                    var refTime = oceanHeatMapParams.refTime;
                     return refTime;
                 },
                 acTime: function (imageryProvider, x, y, level) {
-                    var acTime =  oceanHeatMapParams.acTime;
+                    var acTime = oceanHeatMapParams.acTime;
                     return acTime;
                 },
                 originTilezxy: function (imageryProvider, x, y, level) {
-                    var originTile =  caculateOriginTile(level,x,y);
+                    var originTile = caculateOriginTile(level, x, y);
                     return originTile.z + "/" + originTile.x + "/" + originTile.y;
                 }
             }
@@ -155,6 +156,7 @@ class Wind3D {
         }
         this.oceanWindyImageLayer = new Cesium.ImageryLayer(provider);
         this.viewer.imageryLayers.add(this.oceanWindyImageLayer);
+        this.lastOceanWindyLayer = this.oceanWindyImageLayer;
 
         // 加载windy陆地底图
         var windyLandLayer_test = new Cesium.ImageryLayer(new Cesium.UrlTemplateImageryProvider({
@@ -164,7 +166,7 @@ class Wind3D {
         });
         windyLandLayer_test.alpha = 1.0;
         this.viewer.imageryLayers.add(windyLandLayer_test);
-        
+
         // 加载windy陆地轮廓底图
         var windyLandLineLayer_test = new Cesium.ImageryLayer(new Cesium.UrlTemplateImageryProvider({
             url: "https://tiles.windy.com/tiles/v10.0/darkmap/{z}/{x}/{y}.png",
@@ -194,47 +196,66 @@ class Wind3D {
         skyAtmosphere.brightnessShift = 0.08; // 地面0.08 海底
     }
 
-    setOceanWindyData(){
-        this.oceanWindyImageLayer.provider.reinitialize('https://ims.windy.com/im/v3.0/{directory}/{refTime}/{acTime}/wm_grid_257/{originTilezxy}/seacurrents-surface.jpg');
-        // let provider = new Cesium.UrlTemplateImageryProvider({
-        //     url: 'https://ims.windy.com/im/v3.0/{directory}/{refTime}/{acTime}/wm_grid_257/{originTilezxy}/seacurrents-surface.jpg',
-        //     customTags: {
-        //         directory: function (imageryProvider, x, y, level) {
-        //             var directory =  oceanHeatMapParams.directory;
-        //             return directory;
-        //         },
-        //         refTime: function (imageryProvider, x, y, level) {
-        //             var refTime =  oceanHeatMapParams.refTime;
-        //             return refTime;
-        //         },
-        //         acTime: function (imageryProvider, x, y, level) {
-        //             var acTime =  oceanHeatMapParams.acTime;
-        //             return acTime;
-        //         },
-        //         originTilezxy: function (imageryProvider, x, y, level) {
-        //             var originTile =  caculateOriginTile(level,x,y);
-        //             return originTile.z + "/" + originTile.x + "/" + originTile.y;
-        //         }
-        //     }
-        // })
-        // provider.callback = function (image, x, y, level) {
-        //     console.log(image)
-        //     let canvas = document.createElement('canvas')
-        //     let ctx = canvas.getContext('2d')
-        //     canvas.width = image.width
-        //     canvas.height = image.height
-        //     // 不知道为什么，绘制的图像上下颠倒了，需要颠倒回来
-        //     // 裁切一下，剪掉上面那块
-        //     ctx.scale(1, -1);
-        //     ctx.drawImage(image, 0, 0, canvas.width, canvas.height, 0, -canvas.height, canvas.width, canvas.height)
-        //     // 原始jpg转换成热力图canvas
-        //     let heatTileCanvas = loadWindySource(canvas, image, { z: level, x: x, y: y })
-        //     return heatTileCanvas;
-        // }
-        // let oceanWindyImageLayer = new Cesium.ImageryLayer(provider);
-        // this.viewer.imageryLayers.add(oceanWindyImageLayer);
-        // this.viewer.imageryLayers.remove(this.oceanWindyImageLayer);
-        // this.oceanWindyImageLayer = oceanWindyImageLayer;
+    setOceanWindyData() {
+        let provider = new Cesium.UrlTemplateImageryProvider({
+            url: 'https://ims.windy.com/im/v3.0/{directory}/{refTime}/{acTime}/wm_grid_257/{originTilezxy}/seacurrents-surface.jpg',
+            customTags: {
+                directory: function (imageryProvider, x, y, level) {
+                    var directory = oceanHeatMapParams.directory;
+                    return directory;
+                },
+                refTime: function (imageryProvider, x, y, level) {
+                    var refTime = oceanHeatMapParams.refTime;
+                    return refTime;
+                },
+                acTime: function (imageryProvider, x, y, level) {
+                    var acTime = oceanHeatMapParams.acTime;
+                    return acTime;
+                },
+                originTilezxy: function (imageryProvider, x, y, level) {
+                    var originTile = caculateOriginTile(level, x, y);
+                    return originTile.z + "/" + originTile.x + "/" + originTile.y;
+                }
+            }
+        })
+        provider.callback = function (image, x, y, level) {
+            console.log(image)
+            let canvas = document.createElement('canvas')
+            let ctx = canvas.getContext('2d')
+            canvas.width = image.width
+            canvas.height = image.height
+            // 不知道为什么，绘制的图像上下颠倒了，需要颠倒回来
+            // 裁切一下，剪掉上面那块
+            ctx.scale(1, -1);
+            ctx.drawImage(image, 0, 0, canvas.width, canvas.height, 0, -canvas.height, canvas.width, canvas.height)
+            // 原始jpg转换成热力图canvas
+            let heatTileCanvas = loadWindySource(canvas, image, { z: level, x: x, y: y })
+            return heatTileCanvas;
+        }
+        if (this.lastOceanWindyLayer) {
+            this.OceanWindyLayers.push(this.lastOceanWindyLayer);
+        }
+        let oceanWindyImageLayer = new Cesium.ImageryLayer(provider);
+        this.viewer.imageryLayers.add(oceanWindyImageLayer);
+        this.viewer.imageryLayers.lower(oceanWindyImageLayer);
+        this.viewer.imageryLayers.lower(oceanWindyImageLayer);
+        this.lastOceanWindyLayer = oceanWindyImageLayer;
+    }
+
+    clearOldOceanWindyLayer() {
+        if (this.OceanWindyLayers.length > 0) {
+            let len = this.OceanWindyLayers.length;
+            for (let i = 0; i < len-1; i++) {
+                let windyLayer = this.OceanWindyLayers[i];
+                if (windyLayer) {
+                    this.viewer.imageryLayers.remove(windyLayer)
+                }
+                this.OceanWindyLayers.splice(i, 1);
+                len--;
+                i--;
+            }
+            console.log(this.OceanWindyLayers);
+        }
     }
 
     setupEventListeners() {
