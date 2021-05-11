@@ -95,18 +95,20 @@ def interp2d_station_to_grid(lon,lat,data,loc_range = [18,54,73,135],
     
     return [lon_grid,lat_grid,grid_data]
 
-ugrid = interp2d_station_to_grid(lon, lat, u, [bottomLat, topLat, leftLon, rightLon], 0.05)
-vgrid = interp2d_station_to_grid(lon, lat, v, [bottomLat, topLat, leftLon, rightLon], 0.05)
+ugrid = interp2d_station_to_grid(lon, lat, u, [bottomLat, topLat, leftLon, rightLon], 0.01)
+vgrid = interp2d_station_to_grid(lon, lat, v, [bottomLat, topLat, leftLon, rightLon], 0.01)
 ugrid = ugrid[2]
 vgrid = vgrid[2]
 uvImage = []
+height = range(len(ugrid))
+width = range(len(ugrid[0]))
 for i in range(len(ugrid)):
     uvImage.append([])
     for j in range(len(ugrid[i])):
         pixel = [0, 0, 0, 255]
         u = ugrid[i][j]
         v = vgrid[i][j]
-        if((math.isnan(u) & math.isnan(v)) | (u == 0 | v == 0)):
+        if(math.isnan(u) and math.isnan(v)):
             pixel[2] = 255
             for color in pixel:
                 uvImage[i].append(color)
@@ -125,4 +127,4 @@ for i in range(len(ugrid)):
             
             for color in pixel:
                 uvImage[i].append(color)
-png.from_array(uvImage, 'RGBA').save("small_smiley.png")
+png.from_array(uvImage, 'RGBA').save("ocean_flow.png")
