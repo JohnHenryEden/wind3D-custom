@@ -35,22 +35,6 @@ maxU = max(u)
 minV = min(v)
 maxV = max(v)
 
-meta = {
-    "leftLon": leftLon,
-    "rightLon": rightLon,
-    "topLat": topLat,
-    "bottomLat": bottomLat,
-    "minU": minU,
-    "maxU": maxU,
-    "minV": minV,
-    "maxV": maxV,
-    "date": dateTime
-}
-
-print(meta)
-
-with open('ocean_flow.json', 'w', encoding='utf-8') as f:
-    json.dump(meta, f, ensure_ascii=False, indent=4)
 
 def interp2d_station_to_grid(lon,lat,data,loc_range = [18,54,73,135],
                              det_grid = 1 ,method = 'cubic'):
@@ -100,8 +84,8 @@ vgrid = interp2d_station_to_grid(lon, lat, v, [bottomLat, topLat, leftLon, right
 ugrid = ugrid[2]
 vgrid = vgrid[2]
 uvImage = []
-height = range(len(ugrid))
-width = range(len(ugrid[0]))
+height = len(ugrid)
+width = len(ugrid[0])
 for i in range(len(ugrid)):
     uvImage.append([])
     for j in range(len(ugrid[i])):
@@ -128,3 +112,22 @@ for i in range(len(ugrid)):
             for color in pixel:
                 uvImage[i].append(color)
 png.from_array(uvImage, 'RGBA').save("ocean_flow.png")
+
+meta = {
+    "leftlon": leftLon,
+    "rightlon": rightLon,
+    "toplat": topLat,
+    "bottomlat": bottomLat,
+    "uMin": minU,
+    "uMax": maxU,
+    "vMin": minV,
+    "vMax": maxV,
+    "width": width,
+    "height": height,
+    "date": dateTime
+}
+
+print(meta)
+
+with open('ocean_flow.json', 'w', encoding='utf-8') as f:
+    json.dump(meta, f, ensure_ascii=False, indent=4)

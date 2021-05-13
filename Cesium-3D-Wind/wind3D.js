@@ -7,6 +7,7 @@ class Wind3D {
             infoBox: false,
             fullscreenElement: 'cesiumContainer',
             scene3DOnly: true,
+            lonLatRange: null
             // sceneMode: Cesium.SceneMode.COLUMBUS_VIEW // 2.5D模式
         }
 
@@ -34,20 +35,20 @@ class Wind3D {
         this.setGlobeLayer(this.panel.getUserInput());
     }
 
-    addPrimitives() {
+    addPrimitives(particleSystem) {
         // the order of primitives.add() should respect the dependency of primitives
-        this.scene.primitives.add(this.particleSystem.particlesComputing.primitives.calculateSpeed);
-        this.scene.primitives.add(this.particleSystem.particlesComputing.primitives.updatePosition);
-        this.scene.primitives.add(this.particleSystem.particlesComputing.primitives.postProcessingPosition);
+        this.scene.primitives.add(particleSystem.particlesComputing.primitives.calculateSpeed);
+        this.scene.primitives.add(particleSystem.particlesComputing.primitives.updatePosition);
+        this.scene.primitives.add(particleSystem.particlesComputing.primitives.postProcessingPosition);
 
-        this.scene.primitives.add(this.particleSystem.particlesRendering.primitives.segments);
-        this.scene.primitives.add(this.particleSystem.particlesRendering.primitives.trails);
-        this.scene.primitives.add(this.particleSystem.particlesRendering.primitives.screen);
+        this.scene.primitives.add(particleSystem.particlesRendering.primitives.segments);
+        this.scene.primitives.add(particleSystem.particlesRendering.primitives.trails);
+        this.scene.primitives.add(particleSystem.particlesRendering.primitives.screen);
     }
 
     updateViewerParameters() {
         var viewRectangle = this.camera.computeViewRectangle(this.scene.globe.ellipsoid);
-        var lonLatRange = Util.viewRectangleToLonLatRange(viewRectangle);
+        var lonLatRange = this.lonLatRange || Util.viewRectangleToLonLatRange(viewRectangle);
         this.viewerParameters.lonRange.x = lonLatRange.lon.min;
         this.viewerParameters.lonRange.y = lonLatRange.lon.max;
         this.viewerParameters.latRange.x = lonLatRange.lat.min;
@@ -107,7 +108,17 @@ class Wind3D {
             }
         }
 
-        let windyUrl = 'https://ims.windy.com/im/v3.0/forecast/cmems/2021051112/2021051113/wm_grid_257/{originTilezxy}/seacurrents-surface.jpg';
+        DataProcess.loadData().then(
+            (data) => {
+                that.particleSystem = new ParticleSystem(that.scene.context, data,
+                    that.panel.getUserInput(), that.viewerParameters);
+                that.addPrimitives(that.particleSystem);
+                that.setupEventListeners(that.particleSystem);
+
+                if (mode.debug) {
+                    that.debug();
+                }
+            });
         let that = this;
         let provider = new Cesium.UrlTemplateImageryProvider({
             url: 'https://ims.windy.com/im/v3.0/{directory}/{refTime}/{acTime}/wm_grid_257/{originTilezxy}/seacurrents-surface.jpg',
@@ -143,36 +154,136 @@ class Wind3D {
             let heatTileCanvas = loadWindySource(canvas, image, { z: level, x: x, y: y })
             return heatTileCanvas;
         }
-        this.oceanWindyImageLayer = new Cesium.ImageryLayer(provider);
-        this.viewer.imageryLayers.add(this.oceanWindyImageLayer);
-        this.lastOceanWindyLayer = this.oceanWindyImageLayer;
+        // this.oceanWindyImageLayer = new Cesium.ImageryLayer(provider);
+        // this.viewer.imageryLayers.add(this.oceanWindyImageLayer);
+        // this.lastOceanWindyLayer = this.oceanWindyImageLayer;
 
 
-        let entireMapCanvas = document.createElement('canvas');
-        let ctx = entireMapCanvas.getContext('2d');
-        let imgnw = new Image();
-        imgnw.crossOrigin = 'anonymous'
-        imgnw.src = windyUrl.replace('{originTilezxy}', '0/0/0')
-
-        imgnw.onload = function(){
-            entireMapCanvas.width = imgnw.width
-            entireMapCanvas.height = imgnw.height - 8
-            ctx.drawImage(imgnw, 0, 8, imgnw.width, imgnw.height - 8, 0, 0, imgnw.width, imgnw.height)
-            let url = entireMapCanvas.toDataURL()
-            
-            DataProcess.loadData(url).then(
+        let providerUv = new Cesium.UrlTemplateImageryProvider({
+            url: 'https://ims.windy.com/im/v3.0/{directory}/{refTime}/{acTime}/wm_grid_257/{z}/{x}/{y}/seacurrents-surface.jpg',
+            maximumLevel : 2,
+            customTags: {
+                directory: function (imageryProvider, x, y, level) {
+                    var directory = oceanHeatMapParams.directory;
+                    return directory;
+                },
+                refTime: function (imageryProvider, x, y, level) {
+                    var refTime = oceanHeatMapParams.refTime;
+                    return refTime;
+                },
+                acTime: function (imageryProvider, x, y, level) {
+                    var acTime = oceanHeatMapParams.acTime;
+                    return acTime;
+                },
+                originTilezxy: function (imageryProvider, x, y, level) {
+                    var originTile = caculateOriginTile(level, x, y);
+                    return originTile.z + "/" + originTile.x + "/" + originTile.y;
+                }
+            }
+        })
+        this.scene.primitives.removeAll();
+        let dataCanvas = document.createElement('canvas');
+        let dataCtx = dataCanvas.getContext('2d');
+        dataCanvas.width = providerUv.tileWidth * 2;
+        dataCanvas.height = providerUv.tileHeight * 2;
+        let dataCanvasLoaded = new Promise(function(resolve, reject){
+            let nw = false;
+            let ne = false;
+            let sw = false;
+            let se = false;
+            providerUv.callback = function (image, x, y, level) {
+                let canvas = document.createElement('canvas')
+                let ctx = canvas.getContext('2d')
+                canvas.width = image.width
+                canvas.height = image.height
+                // 不知道为什么，绘制的图像上下颠倒了，需要颠倒回来
+                // 裁切一下，剪掉上面那块
+                ctx.scale(1, -1);
+                // 增添绘制到dataCanvas
+                if(y === 0){
+                    ctx.drawImage(image, 0, 0, canvas.width, canvas.height - 8, 0, -canvas.height, canvas.width, canvas.height)
+                }else {
+                    ctx.drawImage(image, 0, 0, canvas.width, canvas.height - 8, 0, -canvas.height, canvas.width, canvas.height)
+                }
+                if(level === 1){
+                    // let ibm = null;
+                    // if(y === 0){
+                    //     ibm = createImageBitmap(canvas, 0, 0, canvas.width, canvas.height)
+                    // }else {
+                    //     ibm = createImageBitmap(canvas, 0, 0, canvas.width, canvas.height,)
+                    // }
+                    // if(ibm !== null){
+                    //     ibm.then(function(res){
+                    //         if(y === 0){
+                    //             dataCtx.drawImage(res, canvas.width * x, canvas.width * y)
+                    //         }else {
+                    //             dataCtx.drawImage(res, canvas.width * x, canvas.width * y)
+                    //         }
+                    //         switch (true){
+                    //             case (x === 0 && y === 0):
+                    //                 nw = true;
+                    //                 break;
+                    //             case (x === 0 && y === 1):
+                    //                 ne = true;
+                    //                 break;
+                    //             case (x === 1 && y === 0):
+                    //                 sw = true;
+                    //                 break;
+                    //             case (x === 1 && y === 1):
+                    //                 se = true;
+                    //                 break;
+                    //         }
+                    //         if((nw === ne === sw === se) && nw === true){
+                    //             // 必须确保全部加载出来，否则粒子效果会出错
+                    //             setTimeout(() => {
+                    //                 console.log(dataCanvas.toDataURL())
+                    //                 resolve(dataCanvas);
+                    //             }, 1000);
+                    //         }
+                    //     })
+                    // }
+                }
+                return canvas;
+            }
+        });
+        let uvLayer = this.viewer.imageryLayers.addImageryProvider(providerUv);
+        
+        uvLayer.alpha = 0.01;
+        dataCanvasLoaded.then(function(dataCanvas){
+            let meta = {
+                "width": dataCanvas.width,
+                "height": dataCanvas.height,
+                "leftlon": 0,
+                "rightlon": 360,
+                "toplat": 90,
+                "bottomlat": -90,
+                "uMin": -50.5715,
+                "uMax": 50.7785,
+                "vMin": -50.995,
+                "vMax": 50.865
+            }
+            DataProcess.loadData(dataCanvas, meta).then(
                 (data) => {
                     that.particleSystem = new ParticleSystem(that.scene.context, data,
                         that.panel.getUserInput(), that.viewerParameters);
-                    that.addPrimitives();
-
-                    that.setupEventListeners();
-
+                    that.scene.primitives.removeAll();
+                    that.addPrimitives(that.particleSystem);
+                    console.log(that.scene.primitives.length)
+                    that.setupEventListeners(that.particleSystem);
+    
                     if (mode.debug) {
                         that.debug();
                     }
                 });
-        }
+                
+            var uv_Test = new Cesium.ImageryLayer(new Cesium.SingleTileImageryProvider({
+                url: dataCanvas.toDataURL(),
+            }), {
+                show: true
+            });
+            uv_Test.alpha = 0.5;
+            that.viewer.imageryLayers.add(uv_Test);
+        })
         // 加载windy陆地底图
         var windyLandLayer_test = new Cesium.ImageryLayer(new Cesium.UrlTemplateImageryProvider({
             url: "https://tiles.windy.com/tiles/v9.0/grayland/{z}/{x}/{y}.png",
@@ -231,7 +342,6 @@ class Wind3D {
             }
         })
         provider.callback = function (image, x, y, level) {
-            console.log(image)
             let canvas = document.createElement('canvas')
             let ctx = canvas.getContext('2d')
             canvas.width = image.width
@@ -270,7 +380,7 @@ class Wind3D {
         }
     }
 
-    setupEventListeners() {
+    setupEventListeners(particleSystem) {
         const that = this;
 
         this.camera.moveStart.addEventListener(function () {
@@ -294,7 +404,12 @@ class Wind3D {
             if (resized) {
                 that.particleSystem.canvasResize(that.scene.context);
                 resized = false;
-                that.addPrimitives();
+                that.scene.primitives.removeAll();
+                if(particleSystem){
+                    that.addPrimitives(particleSystem);
+                }else {
+                    that.addPrimitives(that.particleSystem);
+                }
                 that.scene.primitives.show = true;
             }
         });

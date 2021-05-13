@@ -236,28 +236,28 @@ var hourCount = 1;
 // 预报天数计数器
 var dayNum = 0;
 // 定时器每3s切换一次从当天晚上21点到3天后晚上20点之间每小时的洋流预报热力图
-var startPlayForcast = setInterval(function () {
-    hourCount++
-    forcastHour = forcastHour + 1
-    // 计算预报天数，0-23点为一天时长，超过23点进入下一天0点
-    dayNum = dayNum + parseInt(forcastHour / 24)
-    if (parseInt(forcastHour / 24) >= 1) {
-        // 当时间点到了晚上23点后，时间点应变为第二天0点开始
-        forcastDay = (today.getDate() + dayNum) >= 10 ? today.getDate() + dayNum : "0" + (today.getDate() + dayNum)
-        forcastHour = 0;
-    }
-    if (hourCount > 72) {
-        // 完成3天预报后，重新从当天晚上21点循环进行预报
-        hourCount = 1;
-        dayNum = 0;
-        forcastDay = (today.getDate() + dayNum) >= 10 ? today.getDate() + dayNum : "0" + (today.getDate() + dayNum)
-    }
-    // 预报时间点完整年月日
-    forcastDate = year + "" + month + "" + forcastDay
-    let forcastHourStr = forcastHour >= 10 ? forcastHour : "0" + forcastHour
-    oceanHeatMapParams.acTime = forcastDate + forcastHourStr;
-    wind3D.setOceanWindyData();
-}, 3000)
+// var startPlayForcast = setInterval(function () {
+//     hourCount++
+//     forcastHour = forcastHour + 1
+//     // 计算预报天数，0-23点为一天时长，超过23点进入下一天0点
+//     dayNum = dayNum + parseInt(forcastHour / 24)
+//     if (parseInt(forcastHour / 24) >= 1) {
+//         // 当时间点到了晚上23点后，时间点应变为第二天0点开始
+//         forcastDay = (today.getDate() + dayNum) >= 10 ? today.getDate() + dayNum : "0" + (today.getDate() + dayNum)
+//         forcastHour = 0;
+//     }
+//     if (hourCount > 72) {
+//         // 完成3天预报后，重新从当天晚上21点循环进行预报
+//         hourCount = 1;
+//         dayNum = 0;
+//         forcastDay = (today.getDate() + dayNum) >= 10 ? today.getDate() + dayNum : "0" + (today.getDate() + dayNum)
+//     }
+//     // 预报时间点完整年月日
+//     forcastDate = year + "" + month + "" + forcastDay
+//     let forcastHourStr = forcastHour >= 10 ? forcastHour : "0" + forcastHour
+//     oceanHeatMapParams.acTime = forcastDate + forcastHourStr;
+//     wind3D.setOceanWindyData();
+// }, 3000)
 
 // 定时器每10s清除一次旧的洋流热力图图层
 var clearOldOceanWindyLayer = setInterval(function () {

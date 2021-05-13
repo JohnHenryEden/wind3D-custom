@@ -1,5 +1,6 @@
 // the size of UV textures: width = lon, height = lat*lev
-uniform sampler2D u_wind; // northward wind
+uniform sampler2D U; // eastward wind 
+uniform sampler2D V; // northward wind
 uniform sampler2D currentParticlesPosition; // (lon, lat, lev)
 
 uniform vec3 dimension; // (lon, lat, lev)
@@ -19,8 +20,8 @@ varying vec2 v_textureCoordinates;
 
 vec2 mapPositionToNormalizedIndex2D(vec3 lonLatLev) {
     // ensure the range of longitude and latitude
-    lonLatLev.x = mod(lonLatLev.x, 360.0);
-    lonLatLev.y = clamp(lonLatLev.y, -90.0, 90.0);
+    lonLatLev.x = clamp(lonLatLev.x, minimum.x, maximum.x);
+    lonLatLev.y = clamp(lonLatLev.y, minimum.y, maximum.y);
 
     vec3 index3D = vec3(0.0);
     index3D.x = (lonLatLev.x - minimum.x) / interval.x;
@@ -42,44 +43,41 @@ vec2 mapPositionToNormalizedIndex2D(vec3 lonLatLev) {
     return normalizedIndex2D;
 }
 
-vec2 getWindComponent(sampler2D componentTexture, vec3 lonLatLev) {
+float getWindComponent(sampler2D componentTexture, vec3 lonLatLev) {
     vec2 normalizedIndex2D = mapPositionToNormalizedIndex2D(lonLatLev);
-    vec4 uvTexture = texture2D(componentTexture, normalizedIndex2D);
-    vec2 result = uvTexture.rg;
-    if(uvTexture.b == 255.0){
-        result = vec2(0.0, 0.0);
+    float result = texture2D(componentTexture, normalizedIndex2D).g;
+    if(result != 9999.0){
+        return result;
     }
-    return result;
 }
 
-vec2 interpolateTexture(sampler2D componentTexture, vec3 lonLatLev) {
+float interpolateTexture(sampler2D componentTexture, vec3 lonLatLev) {
     float lon = lonLatLev.x;
     float lat = lonLatLev.y;
     float lev = lonLatLev.z;
+    
+    float lon0 = floor(lon / interval.x) * interval.x;
+    float lon1 = lon0 + 1.0 * interval.x;
+    float lat0 = floor(lat / interval.y) * interval.y;
+    float lat1 = lat0 + 1.0 * interval.y;
+    
+    float lon0_lat0 = getWindComponent(componentTexture, vec3(lon0, lat0, lev));
+    float lon1_lat0 = getWindComponent(componentTexture, vec3(lon1, lat0, lev));
+    float lon0_lat1 = getWindComponent(componentTexture, vec3(lon0, lat1, lev));
+    float lon1_lat1 = getWindComponent(componentTexture, vec3(lon1, lat1, lev));
 
-    float precisionCoeff = 1.0;
-
-    float lon0 = floor(lon / (interval.x / precisionCoeff)) * (interval.x / precisionCoeff);
-    float lon1 = lon0 + 1.0 * (interval.x / precisionCoeff);
-    float lat0 = floor(lat / (interval.y / precisionCoeff)) * (interval.y / precisionCoeff);
-    float lat1 = lat0 + 1.0 * (interval.y / precisionCoeff);
-
-    vec2 lon0_lat0 = getWindComponent(componentTexture, vec3(lon0, lat0, lev));
-    vec2 lon1_lat0 = getWindComponent(componentTexture, vec3(lon1, lat0, lev));
-    vec2 lon0_lat1 = getWindComponent(componentTexture, vec3(lon0, lat1, lev));
-    vec2 lon1_lat1 = getWindComponent(componentTexture, vec3(lon1, lat1, lev));
-
-    vec2 lon_lat0 = vec2(mix(lon0_lat0.x, lon1_lat0.x, lon - lon0), mix(lon0_lat0.y, lon1_lat0.y, lon - lon0));
-    vec2 lon_lat1 = vec2(mix(lon0_lat1.x, lon1_lat1.x, lon - lon0), mix(lon0_lat1.y, lon1_lat1.y, lon - lon0)); 
-    vec2 lon_lat = vec2(mix(lon_lat0.x, lon_lat1.x, lat - lat0), mix(lon_lat0.y, lon_lat1.y, lat - lat0)); 
+    float lon_lat0 = mix(lon0_lat0, lon1_lat0, lon - lon0);
+    float lon_lat1 = mix(lon0_lat1, lon1_lat1, lon - lon0);
+    float lon_lat = mix(lon_lat0, lon_lat1, lat - lat0);
     return lon_lat;
 }
 
 vec3 linearInterpolation(vec3 lonLatLev) {
     // https://en.wikipedia.org/wiki/Bilinear_interpolation
-    vec2 uv = interpolateTexture(u_wind, lonLatLev);
+    float u = interpolateTexture(U, lonLatLev);
+    float v = interpolateTexture(V, lonLatLev);
     float w = 0.0;
-    return vec3(uv.x, uv.y, w);
+    return vec3(u, v, w);
 }
 
 vec2 lengthOfLonLat(vec3 lonLatLev) {

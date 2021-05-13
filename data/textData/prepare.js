@@ -37,7 +37,6 @@ const { createInterface } = require('readline');
     let ugrid = turf.interpolate(uFeature, 0.1, {gridType: 'triangle'})
     let vgrid = turf.interpolate(vFeature, 0.1, {gridType: 'triangle'})
 
-    debugger
     // fs.writeFileSync('ocean_flow.json', JSON.stringify(meta, null, 2) + '\n');
     console.log('文件已处理');
   } catch (err) {
