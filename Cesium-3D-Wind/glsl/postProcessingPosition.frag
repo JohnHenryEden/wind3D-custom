@@ -43,7 +43,7 @@ void main() {
     vec2 seed2 = nextSpeed.xy + v_textureCoordinates;
     vec3 randomParticle = generateRandomParticle(seed1, nextParticle.z);
     float randomNumber = rand(seed2, normalRange);
-
+    
     if (randomNumber < particleDropRate || particleOutbound(nextParticle)) {
         gl_FragColor = vec4(randomParticle, 1.0); // 1.0 means this is a random particle
     } else {

@@ -45,7 +45,6 @@ var DataProcess = (function () {
                 data.lon.min = parseFloat(imageMeta.leftlon);
                 data.lon.max = parseFloat(imageMeta.rightlon);
 
-                
                 let unitLat = ((parseFloat(imageMeta.toplat) + 90) - (parseFloat(imageMeta.bottomlat) + 90)) / imgHeight;
                 let latArray = [];
                 for(let i = 0; i < imgHeight; i++){
@@ -57,6 +56,7 @@ var DataProcess = (function () {
                 data.lat.min = parseFloat(imageMeta.bottomlat);
                 data.lat.max = parseFloat(imageMeta.toplat);
                 
+
                 data.lev = {};
                 data.lev.array = new Float32Array([1]);
                 data.lev.min = Math.min(...data.lev.array);
@@ -108,32 +108,48 @@ var DataProcess = (function () {
 
             var imageData = ctx.getImageData(0, 1, imgWidth, imgHeight);
             var paddedData = imageData.data;
-            let unitLon = Math.abs((parseFloat(imageMeta.rightlon) - parseFloat(imageMeta.leftlon))) / imgWidth;
-            let lonArray = [];
-            for(let i = 0; i < imgWidth; i++){
-                let lonPixel = parseFloat(imageMeta.leftlon) + (unitLon * i)
-                lonPixel = lonPixel < 0 ? lonPixel + 360 : lonPixel
-                lonPixel = lonPixel > 360 ? lonPixel - 360 : lonPixel
-                lonArray.push(lonPixel)
-            }
-            lonArray.push(parseFloat(imageMeta.rightlon));
             data.lon = {}
-            data.lon.array = new Float32Array(lonArray);
+            data.lon.array = new Float32Array(imageMeta.lonArray);
             data.lon.min = parseFloat(imageMeta.leftlon);
             data.lon.max = parseFloat(imageMeta.rightlon);
 
             
-            let unitLat = ((parseFloat(imageMeta.toplat) + 90) - (parseFloat(imageMeta.bottomlat) + 90)) / imgHeight;
-            let latArray = [];
-            for(let i = 0; i < imgHeight; i++){
-                latArray.push(parseFloat(imageMeta.bottomlat) + (unitLat * i))
-            }
-            latArray.push(parseFloat(imageMeta.toplat));
             data.lat = {};
-            data.lat.array = new Float32Array(latArray);
+            data.lat.array = new Float32Array(imageMeta.latArray);
             data.lat.min = parseFloat(imageMeta.bottomlat);
             data.lat.max = parseFloat(imageMeta.toplat);
             
+            
+            data.lonLatArray = []
+            data.latArray = {}
+            let lonLatArray = [];
+            let latArrayMin = 0;
+            let latArrayMax = 0;
+            for(let i = 0; i < imageMeta.lonArray.length; i++){
+                for(let j = 0; j < imageMeta.latArray.length; j++){
+                    let lon0 = imageMeta.lonArray[i] 
+                    let lon1 = imageMeta.lonArray[i + 1]
+                    let lat0 = imageMeta.latArray[j]
+                    let lat1 = imageMeta.latArray[j + 1]
+                    if(lon1 === undefined){
+                        lon1 = 360
+                    }
+                    if(lat1 === undefined){
+                        lat1 = imageMeta.latArray[0] * -1
+                    }
+                    lonLatArray.push(Math.abs(lon0 - lon1));
+                    lonLatArray.push(Math.abs(lat0 - lat1));
+                    if(j === 510){
+                        latArrayMin = Math.abs(lat0 - lat1)
+                    }
+                    if(lat0 === 0){
+                        latArrayMax = Math.abs(lat0 - lat1)
+                    }
+                }
+            }
+            data.lonLatArray = new Float32Array(lonLatArray);
+            data.latArray.min = latArrayMin;
+            data.latArray.max = latArrayMax;
             data.lev = {};
             data.lev.array = new Float32Array([1]);
             data.lev.min = Math.min(...data.lev.array);
@@ -143,14 +159,15 @@ var DataProcess = (function () {
             let Umax = parseFloat(imageMeta.uMax);
             let Umin = parseFloat(imageMeta.uMin);
             let Uarray = [];
+            let UImagearray = [];
             // 逆算转换公式
             paddedData.forEach((v, i) => {
                 if(i % 4 === 0 && paddedData[i + 2] < 50){
                     let u = ((v * (Umax - Umin)) / 255) + Umin
-                    Uarray.push(u)
+                    Uarray.push(u) 
                 }else if(i % 4 === 0 && paddedData[i + 2] >= 50){
                     let u = 9999
-                    Uarray.push(u)
+                    Uarray.push(u) 
                 }
             })
             data.U.array = new Float32Array(Uarray);
@@ -161,18 +178,20 @@ var DataProcess = (function () {
             let Vmax = parseFloat(imageMeta.uMax);
             let Vmin = parseFloat(imageMeta.uMin);
             let Varray = [];
+            let VImagearray = [];
             paddedData.forEach((v, i) => {
                 if(i % 4 === 1 && paddedData[i + 1] < 50){
                     let vdata = ((v * (Vmax - Vmin)) / 255) + Vmin
-                    Varray.push(vdata)
+                    Varray.push(vdata) 
                 }else if(i % 4 === 1 && paddedData[i + 1] >= 50){
                     let vdata = 9999
-                    Varray.push(vdata)
+                    Varray.push(vdata) 
                 }
             })
             data.V.array = new Float32Array(Varray);
             data.V.min = Vmin;
             data.V.max = Vmax;
+            
             resolve(data);
         });
     }

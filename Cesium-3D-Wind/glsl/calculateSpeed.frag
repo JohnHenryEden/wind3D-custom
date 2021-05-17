@@ -1,6 +1,7 @@
 // the size of UV textures: width = lon, height = lat*lev
 uniform sampler2D U; // eastward wind 
 uniform sampler2D V; // northward wind
+uniform sampler2D grid; // Web Mercator projected lon lat grid
 uniform sampler2D currentParticlesPosition; // (lon, lat, lev)
 
 uniform vec3 dimension; // (lon, lat, lev)
@@ -11,6 +12,7 @@ uniform vec3 interval; // interval of each dimension
 // used to calculate the wind norm
 uniform vec2 uSpeedRange; // (min, max);
 uniform vec2 vSpeedRange;
+uniform vec2 gridLatRange;
 uniform float pixelSize;
 uniform float speedFactor;
 
@@ -18,15 +20,56 @@ float speedScaleFactor = speedFactor * pixelSize;
 
 varying vec2 v_textureCoordinates;
 
+float varMax(float a, float b){
+    if(a > b){
+        return a;
+    }else {
+        return b;
+    }
+}
+float varMin(float a, float b){
+    if(a > b){
+        return b;
+    }else {
+        return a;
+    }
+}
+
+vec2 mercator (float longitude, float latitude) {
+    float PI = 3.14159265;
+    float radius = 6378137.0;
+    float max = 85.0511287798;
+    float radians = PI / 180.0;
+    vec2 point;
+  
+    point.x = radius * longitude * radians;
+    point.y = varMax(varMin(max, latitude), -max) * radians;
+    point.y = radius * log(tan((PI / 4.0) + (point.y / 2.0)));
+  
+    return point;
+  }
+
 vec2 mapPositionToNormalizedIndex2D(vec3 lonLatLev) {
     // ensure the range of longitude and latitude
+
     lonLatLev.x = clamp(lonLatLev.x, minimum.x, maximum.x);
     lonLatLev.y = clamp(lonLatLev.y, minimum.y, maximum.y);
+    
+    vec2 merc = mercator(lonLatLev.x, lonLatLev.y);
+    vec2 mercLatRange = vec2(-20048966.10, 20048966.10);
+    float mercInterval = (mercLatRange.y - mercLatRange.x) / 511.0;
 
     vec3 index3D = vec3(0.0);
-    index3D.x = (lonLatLev.x - minimum.x) / interval.x;
-    index3D.y = (lonLatLev.y - minimum.y) / interval.y;
-    index3D.z = (lonLatLev.z - minimum.z) / interval.z;
+    if(gridLatRange.x != 0.0 && gridLatRange.y != 0.0){
+        index3D.x = (lonLatLev.x - minimum.x) / interval.x;
+        index3D.y = (merc.y - mercLatRange.x) / mercInterval; // 如何把纬度方向上的畸变形成一个刻度变化的坐标系?
+        index3D.z = (lonLatLev.z - minimum.z) / interval.z;
+    }else {
+        index3D.x = (lonLatLev.x - minimum.x) / interval.x;
+        index3D.y = (lonLatLev.y - minimum.y) / interval.y;
+        index3D.z = (lonLatLev.z - minimum.z) / interval.z;
+    }
+
 
     // the st texture coordinate corresponding to (col, row) index
     // example
@@ -45,31 +88,35 @@ vec2 mapPositionToNormalizedIndex2D(vec3 lonLatLev) {
 
 float getWindComponent(sampler2D componentTexture, vec3 lonLatLev) {
     vec2 normalizedIndex2D = mapPositionToNormalizedIndex2D(lonLatLev);
-    float result = texture2D(componentTexture, normalizedIndex2D).g;
-    if(result != 9999.0){
-        return result;
-    }
+    float result = texture2D(componentTexture, normalizedIndex2D).x;
+    return result;
 }
 
 float interpolateTexture(sampler2D componentTexture, vec3 lonLatLev) {
     float lon = lonLatLev.x;
     float lat = lonLatLev.y;
     float lev = lonLatLev.z;
-    
-    float lon0 = floor(lon / interval.x) * interval.x;
-    float lon1 = lon0 + 1.0 * interval.x;
-    float lat0 = floor(lat / interval.y) * interval.y;
-    float lat1 = lat0 + 1.0 * interval.y;
-    
+
+    vec2 webMercatorGrid = texture2D(grid, v_textureCoordinates).xy;
+    float normalizedY = webMercatorGrid.y * ((webMercatorGrid.y - gridLatRange.x) / (gridLatRange.y - gridLatRange.x));
+    float lon0 = floor(lon / webMercatorGrid.x) * webMercatorGrid.x;
+    float lon1 = lon0 + 1.0 * webMercatorGrid.x;
+    float lat0 = floor(lat / normalizedY) * normalizedY;
+    float lat1 = lat0 + 1.0 * normalizedY;
+
     float lon0_lat0 = getWindComponent(componentTexture, vec3(lon0, lat0, lev));
     float lon1_lat0 = getWindComponent(componentTexture, vec3(lon1, lat0, lev));
     float lon0_lat1 = getWindComponent(componentTexture, vec3(lon0, lat1, lev));
     float lon1_lat1 = getWindComponent(componentTexture, vec3(lon1, lat1, lev));
 
-    float lon_lat0 = mix(lon0_lat0, lon1_lat0, lon - lon0);
-    float lon_lat1 = mix(lon0_lat1, lon1_lat1, lon - lon0);
-    float lon_lat = mix(lon_lat0, lon_lat1, lat - lat0);
-    return lon_lat;
+    if(lon0_lat0 != 9999.0 && lon1_lat0 != 9999.0 && lon0_lat1 != 9999.0 && lon1_lat1 != 9999.0){
+        float lon_lat0 = mix(lon0_lat0, lon1_lat0, lon - lon0);
+        float lon_lat1 = mix(lon0_lat1, lon1_lat1, lon - lon0);
+        float lon_lat = mix(lon_lat0, lon_lat1, lat - lat0);
+        return lon_lat;
+    }else {
+        return 9999.0;
+    }
 }
 
 vec3 linearInterpolation(vec3 lonLatLev) {

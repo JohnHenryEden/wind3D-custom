@@ -1,6 +1,7 @@
 class ParticlesComputing {
     constructor(context, data, userInput, viewerParameters) {
         this.createWindTextures(context, data);
+        this.createGridTextures(context, data);
         this.createParticlesTextures(context, userInput, viewerParameters);
         this.createComputingPrimitives(data, userInput, viewerParameters);
     }
@@ -23,6 +24,23 @@ class ParticlesComputing {
             U: Util.createTexture(windTextureOptions, data.U.array),
             V: Util.createTexture(windTextureOptions, data.V.array),
         };
+    }
+
+    createGridTextures(context, data) {
+        var gridTextureOptions = {
+            context: context,
+            width: data.lon.array.length,
+            height: data.lat.array.length,
+            pixelFormat: Cesium.PixelFormat.LUMINANCE_ALPHA, //两个维度
+            pixelDatatype: Cesium.PixelDatatype.FLOAT,
+            flipY: false,
+            sampler: new Cesium.Sampler({
+                // the values of texture will not be interpolated
+                minificationFilter: Cesium.TextureMinificationFilter.NEAREST,
+                magnificationFilter: Cesium.TextureMagnificationFilter.NEAREST
+            })
+        };
+        this.gridTextures = Util.createTexture(gridTextureOptions, data.lonLatArray);
     }
 
     createParticlesTextures(context, userInput, viewerParameters) {
@@ -71,7 +89,7 @@ class ParticlesComputing {
         );
         const uSpeedRange = new Cesium.Cartesian2(data.U.min, data.U.max);
         const vSpeedRange = new Cesium.Cartesian2(data.V.min, data.V.max);
-
+        const gridLatRange = data.latArray ? new Cesium.Cartesian2(data.latArray.min, data.latArray.max) : new Cesium.Cartesian2(0.0, 0.0);
         const that = this;
         this.primitives = {
             calculateSpeed: new CustomPrimitive({
@@ -82,6 +100,9 @@ class ParticlesComputing {
                     },
                     V: function () {
                         return that.windTextures.V;
+                    },
+                    grid: function () {
+                        return that.gridTextures;
                     },
                     currentParticlesPosition: function () {
                         return that.particlesTextures.currentParticlesPosition;
@@ -103,6 +124,9 @@ class ParticlesComputing {
                     },
                     vSpeedRange: function () {
                         return vSpeedRange;
+                    },
+                    gridLatRange: function () {
+                        return gridLatRange;
                     },
                     pixelSize: function () {
                         return viewerParameters.pixelSize;

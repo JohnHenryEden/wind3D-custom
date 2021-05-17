@@ -48,6 +48,7 @@ class Wind3D {
 
     updateViewerParameters() {
         var viewRectangle = this.camera.computeViewRectangle(this.scene.globe.ellipsoid);
+        
         var lonLatRange = this.lonLatRange || Util.viewRectangleToLonLatRange(viewRectangle);
         this.viewerParameters.lonRange.x = lonLatRange.lon.min;
         this.viewerParameters.lonRange.y = lonLatRange.lon.max;
@@ -154,9 +155,9 @@ class Wind3D {
             let heatTileCanvas = loadWindySource(canvas, image, { z: level, x: x, y: y })
             return heatTileCanvas;
         }
-        // this.oceanWindyImageLayer = new Cesium.ImageryLayer(provider);
-        // this.viewer.imageryLayers.add(this.oceanWindyImageLayer);
-        // this.lastOceanWindyLayer = this.oceanWindyImageLayer;
+        this.oceanWindyImageLayer = new Cesium.ImageryLayer(provider);
+        this.viewer.imageryLayers.add(this.oceanWindyImageLayer);
+        this.lastOceanWindyLayer = this.oceanWindyImageLayer;
 
 
         let providerUv = new Cesium.UrlTemplateImageryProvider({
@@ -186,6 +187,9 @@ class Wind3D {
         let dataCtx = dataCanvas.getContext('2d');
         dataCanvas.width = providerUv.tileWidth * 2;
         dataCanvas.height = providerUv.tileHeight * 2;
+        // 利用潘卓然写的代码，获取正确的经纬度
+        let lonArray = []
+        let latArray = [] 
         let dataCanvasLoaded = new Promise(function(resolve, reject){
             let nw = false;
             let ne = false;
@@ -194,54 +198,54 @@ class Wind3D {
             providerUv.callback = function (image, x, y, level) {
                 let canvas = document.createElement('canvas')
                 let ctx = canvas.getContext('2d')
-                canvas.width = image.width
-                canvas.height = image.height
+                canvas.width = 256
+                canvas.height = 256
                 // 不知道为什么，绘制的图像上下颠倒了，需要颠倒回来
                 // 裁切一下，剪掉上面那块
                 ctx.scale(1, -1);
                 // 增添绘制到dataCanvas
-                if(y === 0){
-                    ctx.drawImage(image, 0, 0, canvas.width, canvas.height - 8, 0, -canvas.height, canvas.width, canvas.height)
-                }else {
-                    ctx.drawImage(image, 0, 0, canvas.width, canvas.height - 8, 0, -canvas.height, canvas.width, canvas.height)
-                }
+                
+                ctx.drawImage(image, 0, 0, image.width, image.height - 8, 0, -canvas.height, canvas.width, canvas.height)
                 if(level === 1){
-                    // let ibm = null;
-                    // if(y === 0){
-                    //     ibm = createImageBitmap(canvas, 0, 0, canvas.width, canvas.height)
-                    // }else {
-                    //     ibm = createImageBitmap(canvas, 0, 0, canvas.width, canvas.height,)
-                    // }
-                    // if(ibm !== null){
-                    //     ibm.then(function(res){
-                    //         if(y === 0){
-                    //             dataCtx.drawImage(res, canvas.width * x, canvas.width * y)
-                    //         }else {
-                    //             dataCtx.drawImage(res, canvas.width * x, canvas.width * y)
-                    //         }
-                    //         switch (true){
-                    //             case (x === 0 && y === 0):
-                    //                 nw = true;
-                    //                 break;
-                    //             case (x === 0 && y === 1):
-                    //                 ne = true;
-                    //                 break;
-                    //             case (x === 1 && y === 0):
-                    //                 sw = true;
-                    //                 break;
-                    //             case (x === 1 && y === 1):
-                    //                 se = true;
-                    //                 break;
-                    //         }
-                    //         if((nw === ne === sw === se) && nw === true){
-                    //             // 必须确保全部加载出来，否则粒子效果会出错
-                    //             setTimeout(() => {
-                    //                 console.log(dataCanvas.toDataURL())
-                    //                 resolve(dataCanvas);
-                    //             }, 1000);
-                    //         }
-                    //     })
-                    // }
+                    for(let i = 0; i < canvas.width; i++){
+                        for(let j = 0; j < canvas.height; j++){
+
+                            let tile = { level: level, col: y, row: x };
+                            let offset = { x: i, y: j };
+                            let lonlat = getMecartorTileLonlat(tile, offset);
+                            //转为0-360
+                            lonArray.push(lonlat.lon + 180); 
+                            latArray.push(lonlat.lat);
+                        }
+                    }
+                    let ibm = null;
+                    ibm = createImageBitmap(canvas, 0, 0, canvas.width, canvas.height)
+                    if(ibm !== null){
+                        ibm.then(function(res){
+                            dataCtx.drawImage(res, canvas.width * (x === 0 ? 1 : 0), canvas.width * y)
+                            switch (true){
+                                case (x === 0 && y === 0):
+                                    nw = true;
+                                    break;
+                                case (x === 0 && y === 1):
+                                    ne = true;
+                                    break;
+                                case (x === 1 && y === 0):
+                                    sw = true;
+                                    break;
+                                case (x === 1 && y === 1):
+                                    se = true;
+                                    break;
+                            }
+                            if((nw === ne === sw === se) && nw === true){
+                                // 必须确保全部加载出来，否则粒子效果会出错
+                                setTimeout(() => {
+                                    console.log(dataCanvas.toDataURL());
+                                    resolve(dataCanvas);
+                                }, 1000);
+                            }
+                        })
+                    }
                 }
                 return canvas;
             }
@@ -250,17 +254,36 @@ class Wind3D {
         
         uvLayer.alpha = 0.01;
         dataCanvasLoaded.then(function(dataCanvas){
+            lonArray = lonArray.sort((a, b) => a - b);
+            latArray = latArray.sort((a, b) => b - a);
+            function unique (arr) {
+                return Array.from(new Set(arr))
+            }
+            lonArray = unique(lonArray)
+            latArray = unique(latArray)
             let meta = {
                 "width": dataCanvas.width,
                 "height": dataCanvas.height,
                 "leftlon": 0,
                 "rightlon": 360,
-                "toplat": 90,
-                "bottomlat": -90,
+                "toplat": latArray[0],
+                "bottomlat": latArray[latArray.length - 1],
+                "lonArray": lonArray,
+                "latArray": latArray,
                 "uMin": -50.5715,
                 "uMax": 50.7785,
                 "vMin": -50.995,
                 "vMax": 50.865
+            }
+            that.lonLatRange = {
+                lon: {
+                    min: 0,
+                    max: 360
+                },
+                lat: {
+                    min: latArray[latArray.length - 1],
+                    max: latArray[0]
+                }
             }
             DataProcess.loadData(dataCanvas, meta).then(
                 (data) => {
@@ -275,14 +298,6 @@ class Wind3D {
                         that.debug();
                     }
                 });
-                
-            var uv_Test = new Cesium.ImageryLayer(new Cesium.SingleTileImageryProvider({
-                url: dataCanvas.toDataURL(),
-            }), {
-                show: true
-            });
-            uv_Test.alpha = 0.5;
-            that.viewer.imageryLayers.add(uv_Test);
         })
         // 加载windy陆地底图
         var windyLandLayer_test = new Cesium.ImageryLayer(new Cesium.UrlTemplateImageryProvider({
