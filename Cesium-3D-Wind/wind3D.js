@@ -30,7 +30,6 @@ class Wind3D {
         this.globeBoundingSphere = new Cesium.BoundingSphere(Cesium.Cartesian3.ZERO, 0.99 * 6378137.0);
         this.updateViewerParameters();
 
-
         this.imageryLayers = this.viewer.imageryLayers;
         this.setGlobeLayer(this.panel.getUserInput());
     }
@@ -108,7 +107,7 @@ class Wind3D {
                 break;
             }
         }
-
+        let that = this;
         DataProcess.loadData().then(
             (data) => {
                 that.particleSystem = new ParticleSystem(that.scene.context, data,
@@ -120,218 +119,6 @@ class Wind3D {
                     that.debug();
                 }
             });
-        let that = this;
-        let provider = new Cesium.UrlTemplateImageryProvider({
-            url: 'https://ims.windy.com/im/v3.0/{directory}/{refTime}/{acTime}/wm_grid_257/{originTilezxy}/seacurrents-surface.jpg',
-            customTags: {
-                directory: function (imageryProvider, x, y, level) {
-                    var directory = oceanHeatMapParams.directory;
-                    return directory;
-                },
-                refTime: function (imageryProvider, x, y, level) {
-                    var refTime = oceanHeatMapParams.refTime;
-                    return refTime;
-                },
-                acTime: function (imageryProvider, x, y, level) {
-                    var acTime = oceanHeatMapParams.acTime;
-                    return acTime;
-                },
-                originTilezxy: function (imageryProvider, x, y, level) {
-                    var originTile = caculateOriginTile(level, x, y);
-                    return originTile.z + "/" + originTile.x + "/" + originTile.y;
-                }
-            }
-        })
-        provider.callback = function (image, x, y, level) {
-            let canvas = document.createElement('canvas')
-            let ctx = canvas.getContext('2d')
-            canvas.width = image.width
-            canvas.height = image.height
-            // 不知道为什么，绘制的图像上下颠倒了，需要颠倒回来
-            // 裁切一下，剪掉上面那块
-            ctx.scale(1, -1);
-            ctx.drawImage(image, 0, 0, canvas.width, canvas.height, 0, -canvas.height, canvas.width, canvas.height)
-            // 原始jpg转换成热力图canvas
-            let heatTileCanvas = loadWindySource(canvas, image, { z: level, x: x, y: y })
-            return heatTileCanvas;
-        }
-        this.oceanWindyImageLayer = new Cesium.ImageryLayer(provider);
-        this.viewer.imageryLayers.add(this.oceanWindyImageLayer);
-        this.lastOceanWindyLayer = this.oceanWindyImageLayer;
-
-
-        let providerUv = new Cesium.UrlTemplateImageryProvider({
-            url: 'https://ims.windy.com/im/v3.0/{directory}/{refTime}/{acTime}/wm_grid_257/{z}/{x}/{y}/seacurrents-surface.jpg',
-            maximumLevel : 2,
-            customTags: {
-                directory: function (imageryProvider, x, y, level) {
-                    var directory = oceanHeatMapParams.directory;
-                    return directory;
-                },
-                refTime: function (imageryProvider, x, y, level) {
-                    var refTime = oceanHeatMapParams.refTime;
-                    return refTime;
-                },
-                acTime: function (imageryProvider, x, y, level) {
-                    var acTime = oceanHeatMapParams.acTime;
-                    return acTime;
-                },
-                originTilezxy: function (imageryProvider, x, y, level) {
-                    var originTile = caculateOriginTile(level, x, y);
-                    return originTile.z + "/" + originTile.x + "/" + originTile.y;
-                }
-            }
-        })
-        this.scene.primitives.removeAll();
-        let dataCanvas = document.createElement('canvas');
-        let dataCtx = dataCanvas.getContext('2d');
-        dataCanvas.width = providerUv.tileWidth * 2;
-        dataCanvas.height = providerUv.tileHeight * 2;
-        // 利用潘卓然写的代码，获取正确的经纬度
-        let lonArray = []
-        let latArray = [] 
-        let dataCanvasLoaded = new Promise(function(resolve, reject){
-            let nw = false;
-            let ne = false;
-            let sw = false;
-            let se = false;
-            providerUv.callback = function (image, x, y, level) {
-                let canvas = document.createElement('canvas')
-                let ctx = canvas.getContext('2d')
-                canvas.width = 256
-                canvas.height = 256
-                // 不知道为什么，绘制的图像上下颠倒了，需要颠倒回来
-                // 裁切一下，剪掉上面那块
-                ctx.scale(1, -1);
-                // 增添绘制到dataCanvas
-                
-                ctx.drawImage(image, 0, 0, image.width, image.height - 8, 0, -canvas.height, canvas.width, canvas.height)
-                if(level === 1){
-                    for(let i = 0; i < canvas.width; i++){
-                        for(let j = 0; j < canvas.height; j++){
-
-                            let tile = { level: level, col: y, row: x };
-                            let offset = { x: i, y: j };
-                            let lonlat = getMecartorTileLonlat(tile, offset);
-                            //转为0-360
-                            lonArray.push(lonlat.lon + 180); 
-                            latArray.push(lonlat.lat);
-                        }
-                    }
-                    let ibm = null;
-                    ibm = createImageBitmap(canvas, 0, 0, canvas.width, canvas.height)
-                    if(ibm !== null){
-                        ibm.then(function(res){
-                            dataCtx.drawImage(res, canvas.width * (x === 0 ? 1 : 0), canvas.width * y)
-                            switch (true){
-                                case (x === 0 && y === 0):
-                                    nw = true;
-                                    break;
-                                case (x === 0 && y === 1):
-                                    ne = true;
-                                    break;
-                                case (x === 1 && y === 0):
-                                    sw = true;
-                                    break;
-                                case (x === 1 && y === 1):
-                                    se = true;
-                                    break;
-                            }
-                            if(nw === true && nw === ne && ne === sw && sw === se){
-                                // 必须确保全部加载出来，否则粒子效果会出错
-                                setTimeout(() => {
-                                    console.log(dataCanvas.toDataURL());
-                                    resolve(dataCanvas);
-                                }, 1000);
-                            }
-                        })
-                    }
-                }
-                return canvas;
-            }
-        });
-        let uvLayer = this.viewer.imageryLayers.addImageryProvider(providerUv);
-        
-        uvLayer.alpha = 0.01;
-        dataCanvasLoaded.then(function(dataCanvas){
-            lonArray = lonArray.sort((a, b) => a - b);
-            latArray = latArray.sort((a, b) => b - a);
-            function unique (arr) {
-                return Array.from(new Set(arr))
-            }
-            lonArray = unique(lonArray)
-            latArray = unique(latArray)
-            let meta = {
-                "width": dataCanvas.width,
-                "height": dataCanvas.height,
-                "leftlon": 0,
-                "rightlon": 360,
-                "toplat": latArray[0],
-                "bottomlat": latArray[latArray.length - 1],
-                "lonArray": lonArray,
-                "latArray": latArray,
-                "uMin": -50.5715,
-                "uMax": 50.7785,
-                "vMin": -50.995,
-                "vMax": 50.865
-            }
-            that.lonLatRange = {
-                lon: {
-                    min: 0,
-                    max: 360
-                },
-                lat: {
-                    min: latArray[latArray.length - 1],
-                    max: latArray[0]
-                }
-            }
-            DataProcess.loadData(dataCanvas, meta).then(
-                (data) => {
-                    that.particleSystem = new ParticleSystem(that.scene.context, data,
-                        that.panel.getUserInput(), that.viewerParameters);
-                    that.scene.primitives.removeAll();
-                    that.addPrimitives(that.particleSystem);
-                    console.log(that.scene.primitives.length)
-                    that.setupEventListeners(that.particleSystem);
-    
-                    if (mode.debug) {
-                        that.debug();
-                    }
-                });
-        })
-        // 加载windy陆地底图
-        var windyLandLayer_test = new Cesium.ImageryLayer(new Cesium.UrlTemplateImageryProvider({
-            url: "https://tiles.windy.com/tiles/v9.0/grayland/{z}/{x}/{y}.png",
-        }), {
-            show: true
-        });
-        windyLandLayer_test.alpha = 1.0;
-        this.viewer.imageryLayers.add(windyLandLayer_test);
-
-        // 加载windy陆地轮廓底图
-        var windyLandLineLayer_test = new Cesium.ImageryLayer(new Cesium.UrlTemplateImageryProvider({
-            url: "https://tiles.windy.com/tiles/v10.0/darkmap/{z}/{x}/{y}.png",
-        }), {
-            show: true
-        });
-        this.viewer.imageryLayers.add(windyLandLineLayer_test);
-        // 场景的日照效果
-        this.scene.globe.enableLighting = false;
-        // 贴地遮盖开启(深度检测)
-        this.scene.globe.depthTestAgainstTerrain = true;
-        // 关闭大气层
-        this.scene.globe.showGroundAtmosphere = false;
-        this.scene.skyAtmosphere.show = true;
-        this.scene.fog.enabled = true;
-        this.scene.fog.density = 0.00005;// 地面 0.00005 海底0.00008
-        this.scene.fog.minimumBrightness = 0.03; // 0.03
-        this.scene._hdr = false;
-        var skyAtmosphere = this.scene.skyAtmosphere;
-        this.scene.globe.showGroundAtmosphere = false;
-
-        skyAtmosphere.hueShift = 0.0;
-        skyAtmosphere.saturationShift = 0.1;
-        skyAtmosphere.brightnessShift = 0.08; // 地面0.08 海底
     }
 
     setOceanWindyData() {
@@ -432,9 +219,9 @@ class Wind3D {
         window.addEventListener('particleSystemOptionsChanged', function () {
             that.particleSystem.applyUserInput(that.panel.getUserInput());
         });
-        window.addEventListener('layerOptionsChanged', function () {
-            that.setGlobeLayer(that.panel.getUserInput());
-        });
+        // window.addEventListener('layerOptionsChanged', function () {
+        //     that.setGlobeLayer(that.panel.getUserInput());
+        // });
     }
 
     debug() {
