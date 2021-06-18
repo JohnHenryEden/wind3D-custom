@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from scipy.interpolate import griddata
 import numpy.ma as ma
 import png
+from PIL import Image
 
 req_date = "2021-02-24 08:00:00"
 lon = []
@@ -112,6 +113,11 @@ for i in range(len(ugrid)):
             for color in pixel:
                 uvImage[i].append(color)
 png.from_array(uvImage, 'RGBA').save("ocean_flow.png")
+map_coast = Image.open('map_transparent.png')
+data_png = Image.open('ocean_flow.png')
+data_png.paste(map_coast, (0, 0), map_coast)
+data_png.save('ocean_flow.png')
+
 
 meta = {
     "leftlon": leftLon,

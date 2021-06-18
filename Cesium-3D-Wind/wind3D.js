@@ -237,7 +237,7 @@ class Wind3D {
                                     se = true;
                                     break;
                             }
-                            if((nw === ne === sw === se) && nw === true){
+                            if(nw === true && nw === ne && ne === sw && sw === se){
                                 // 必须确保全部加载出来，否则粒子效果会出错
                                 setTimeout(() => {
                                     console.log(dataCanvas.toDataURL());
