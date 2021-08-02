@@ -2,6 +2,7 @@ uniform sampler2D nextParticlesPosition;
 uniform sampler2D particlesSpeed; // (u, v, w, norm)
 
 // range (min, max)
+precision mediump float;
 uniform vec2 lonRange;
 uniform vec2 latRange;
 
@@ -41,7 +42,10 @@ void main() {
 
     vec2 seed1 = nextParticle.xy + v_textureCoordinates;
     vec2 seed2 = nextSpeed.xy + v_textureCoordinates;
-    vec3 randomParticle = generateRandomParticle(seed1, nextParticle.z);
+    vec3 randomParticle = vec3(0.0);
+    if( nextSpeed.w > 0.0){
+        randomParticle = generateRandomParticle(seed1, nextParticle.z);
+    }
     float randomNumber = rand(seed2, normalRange);
     
     if (randomNumber < particleDropRate || particleOutbound(nextParticle)) {

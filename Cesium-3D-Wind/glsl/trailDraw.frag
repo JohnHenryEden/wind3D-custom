@@ -19,6 +19,7 @@ void main() {
     float globeDepth = czm_unpackDepth(texture2D(czm_globeDepthTexture, textureCoordinate));
 
     gl_FragColor = vec4(0.0);
+    pointsColor.w = 0.2;
     if (pointsDepth < globeDepth) {
         gl_FragColor = gl_FragColor + pointsColor;
     }

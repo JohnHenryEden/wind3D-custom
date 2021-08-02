@@ -55,6 +55,7 @@ vec2 mapPositionToNormalizedIndex2D(vec3 lonLatLev) {
     lonLatLev.x = clamp(lonLatLev.x, minimum.x, maximum.x);
     lonLatLev.y = clamp(lonLatLev.y, minimum.y, maximum.y);
     
+    // 转为墨卡托投影
     vec2 merc = mercator(lonLatLev.x, lonLatLev.y);
     vec2 mercLatRange = vec2(-20048966.10, 20048966.10);
     float mercInterval = (mercLatRange.y - mercLatRange.x) / 511.0;

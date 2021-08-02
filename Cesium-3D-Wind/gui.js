@@ -4,6 +4,7 @@ const fileOptions = {
     dataDirectory: demo ? 'https://raw.githubusercontent.com/RaymanNg/3D-Wind-Field/master/data/' : '../data/',
     dataFile: "demo.nc",
     imgDataFile: "textData/ocean_flow.png",
+    imgDataHeatmap: "textData/ocean_flow_heat.png",
     imgMetaDataFile: "textData/ocean_flow.json",
     glslDirectory: demo ? '../Cesium-3D-Wind/glsl/' : 'glsl/'
 }
@@ -14,8 +15,9 @@ const defaultParticleSystemOptions = {
     fadeOpacity: 0.996,
     dropRate: 0.003,
     dropRateBump: 0.01,
-    speedFactor: 0.4,
-    lineWidth: 4.0
+    speedFactor: 1.0,
+    lineWidth: 4.0,
+    seaHeight: 0.0
 }
 
 const globeLayers = [
@@ -45,6 +47,7 @@ class Panel {
 
         this.globeLayer = defaultLayerOptions.globeLayer;
         this.WMS_URL = defaultLayerOptions.WMS_URL;
+        this.seaHeight = 0.0;
 
         var layerNames = [];
         globeLayers.forEach(function (layer) {
@@ -70,16 +73,11 @@ class Panel {
         }
 
         window.onload = function () {
-            var gui = new dat.GUI({ autoPlace: false });
-            gui.add(that, 'maxParticles', 1, 256 * 256, 1).onFinishChange(onParticleSystemOptionsChange);
-            gui.add(that, 'particleHeight', 1, 10000, 1).onFinishChange(onParticleSystemOptionsChange);
-            gui.add(that, 'fadeOpacity', 0.90, 0.999, 0.001).onFinishChange(onParticleSystemOptionsChange);
-            gui.add(that, 'dropRate', 0.0, 0.1).onFinishChange(onParticleSystemOptionsChange);
-            gui.add(that, 'dropRateBump', 0, 0.2).onFinishChange(onParticleSystemOptionsChange);
-            gui.add(that, 'speedFactor', 0.05, 8).onFinishChange(onParticleSystemOptionsChange);
-            gui.add(that, 'lineWidth', 0.01, 16.0).onFinishChange(onParticleSystemOptionsChange);
 
-            gui.add(that, 'layerToShow', layerNames).onFinishChange(onLayerOptionsChange);
+            var gui = new dat.GUI({ autoPlace: false });
+            gui.add(that, 'maxParticles', 1, 256 * 256, 1).onFinishChange(onParticleSystemOptionsChange).name("最大粒子数量");
+            gui.add(that, 'seaHeight', -10, 500, 1).onFinishChange(onParticleSystemOptionsChange).name("海水淹没高度");
+            
 
             var panelContainer = document.getElementsByClassName('cesium-widget').item(0);
             gui.domElement.classList.add('myPanel');
@@ -102,6 +100,7 @@ class Panel {
             speedFactor: this.speedFactor,
             lineWidth: this.lineWidth,
             globeLayer: this.globeLayer,
+            seaHeight: this.seaHeight,
             WMS_URL: this.WMS_URL
         }
     }

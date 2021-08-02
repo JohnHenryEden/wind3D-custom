@@ -1,21 +1,35 @@
 class Wind3D {
     OceanWindyLayers = []
     constructor(panel, mode) {
+        Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJkZjEwYjdhYS1lYzQ4LTQ5M2EtYTg5My02MDhhMTE1YTJlYmYiLCJpZCI6MTA0MSwiaWF0IjoxNTI2Nzg4NTcwfQ.3T6RRTRCIXu08pYcznhkseiYsLRgQxI3eq4ziLMcvtY';
+
         var options = {
             baseLayerPicker: false,
             geocoder: false,
+            animation:false,
             infoBox: false,
+            homeButton: false,
+            navigationHelpButton: false,
+            timeline: false,
             fullscreenElement: 'cesiumContainer',
             scene3DOnly: true,
-            lonLatRange: null
+            lonLatRange: null,
+            skyAtmosphere: false,
+            terrainProvider : Cesium.createWorldTerrain({
+                url: Cesium.IonResource.fromAssetId(1),
+                requestVertexNormals : true
+            })
             // sceneMode: Cesium.SceneMode.COLUMBUS_VIEW // 2.5D模式
         }
 
         if (mode.debug) {
             options.useDefaultRenderLoop = false;
         }
-
+        
         this.viewer = new Cesium.Viewer('cesiumContainer', options);
+        this.viewer.scene.globe.enableLighting = false;
+        this.viewer.scene.globe.depthTestAgainstTerrain = true;
+        this.viewer.shadows = false;
         this.scene = this.viewer.scene;
         this.camera = this.viewer.camera;
 
@@ -29,9 +43,36 @@ class Wind3D {
         // use a smaller earth radius to make sure distance to camera > 0
         this.globeBoundingSphere = new Cesium.BoundingSphere(Cesium.Cartesian3.ZERO, 0.99 * 6378137.0);
         this.updateViewerParameters();
-
+        this.addSeaPlane()
         this.imageryLayers = this.viewer.imageryLayers;
         this.setGlobeLayer(this.panel.getUserInput());
+    }
+
+    addSeaPlane(){
+        let that = this;
+        let positions = Cesium.Cartesian3.fromDegreesArray([
+            112.0,20.0,
+            112.0,24.0,
+            115.0,24.0,
+            115.0,20.0,
+        ])
+        this.seaPlaneEntity = this.viewer.entities.add({
+            rectangle:{
+                coordinates: Cesium.Rectangle.fromCartesianArray(positions),
+                height: 50,
+                show: new Cesium.CallbackProperty(function () {
+                    if(that.panel.getUserInput().seaHeight > 0){
+                        return true
+                    }
+                    return false
+                }, false),
+                extrudedHeight: new Cesium.CallbackProperty(function () {
+                    return that.panel.getUserInput().seaHeight
+                }, false),
+                perPositionHeight: true,
+                material: Cesium.Color.CYAN.withAlpha(0.6)
+            }
+        })
     }
 
     addPrimitives(particleSystem) {
@@ -44,7 +85,6 @@ class Wind3D {
         this.scene.primitives.add(particleSystem.particlesRendering.primitives.trails);
         this.scene.primitives.add(particleSystem.particlesRendering.primitives.screen);
     }
-
     updateViewerParameters() {
         var viewRectangle = this.camera.computeViewRectangle(this.scene.globe.ellipsoid);
         
@@ -65,48 +105,22 @@ class Wind3D {
         }
     }
 
-    setGlobeLayer(userInput) {
-        this.viewer.imageryLayers.removeAll();
-        this.viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider();
-        var globeLayer = userInput.globeLayer;
-        switch (globeLayer.type) {
-            case "NaturalEarthII": {
 
-                this.viewer.imageryLayers.addImageryProvider(
-                    new Cesium.TileMapServiceImageryProvider({
-                        url: Cesium.buildModuleUrl('Assets/Textures/NaturalEarthII')
-                    })
-                );
-                break;
-            }
-            case "WMS": {
-                this.viewer.imageryLayers.addImageryProvider(new Cesium.WebMapServiceImageryProvider({
-                    url: userInput.WMS_URL,
-                    layers: globeLayer.layer,
-                    parameters: {
-                        ColorScaleRange: globeLayer.ColorScaleRange
-                    }
-                }));
-                break;
-            }
-            case "UVImage": {
-                this.viewer.imageryLayers.addImageryProvider(new Cesium.WebMapServiceImageryProvider({
-                    url: userInput.WMS_URL,
-                    layers: globeLayer.layer,
-                    parameters: {
-                        ColorScaleRange: globeLayer.ColorScaleRange
-                    }
-                }));
-                break;
-            }
-            case "WorldTerrain": {
-                this.viewer.imageryLayers.addImageryProvider(
-                    Cesium.createWorldImagery()
-                );
-                this.viewer.terrainProvider = Cesium.createWorldTerrain();
-                break;
-            }
-        }
+    setGlobeLayer(userInput) {
+        let globeLayer = userInput.globeLayer;
+        // switch (globeLayer.type) {
+        //     case "NaturalEarthII": {
+        //         this.viewer.imageryLayers.addImageryProvider(new Cesium.WebMapTileServiceImageryProvider({
+        //             url: "http://t2.tianditu.gov.cn/img_w/wmts?tk=d0661913245178667ddfe496f4d38749&service=wmts&request=GetTile&version=1.0.0&LAYER=img&tileMatrixSet=w&TileMatrix={TileMatrix}&TileRow={TileRow}&TileCol={TileCol}&style=default&format=tiles",
+        //             layer: "tdtBasicLayer",
+        //             style: "default",
+        //             format: "image/jpeg",
+        //             tileMatrixSetID: "GoogleMapsCompatible",
+        //             show: false
+        //         }))
+        //         break;
+        //     }
+        // }
         let that = this;
         DataProcess.loadData().then(
             (data) => {
@@ -114,6 +128,27 @@ class Wind3D {
                     that.panel.getUserInput(), that.viewerParameters);
                 that.addPrimitives(that.particleSystem);
                 that.setupEventListeners(that.particleSystem);
+                
+                let lonRange = DataProcess.getPixelRange().lon; 
+                let latRange = DataProcess.getPixelRange().lat;
+                
+
+                let heatmapProvider = new Cesium.SingleTileImageryProvider({
+                    url: fileOptions.dataDirectory + fileOptions.imgDataHeatmap,
+                    rectangle: Cesium.Rectangle.fromDegrees(lonRange[0], latRange[0], lonRange[1], latRange[1])
+                })
+                heatmapProvider.defaultAlpha = 0.6
+
+                that.viewer.imageryLayers.addImageryProvider(heatmapProvider)
+
+                that.camera.flyTo({
+                    destination: Cesium.Rectangle.fromDegrees(lonRange[0], latRange[0], lonRange[1], latRange[1]),
+                    orientation : {
+                        heading : 0.0,
+                        pitch : Cesium.Math.toRadians(-85.0),
+                        roll : 0.0
+                    }
+                })
 
                 if (mode.debug) {
                     that.debug();
@@ -204,6 +239,7 @@ class Wind3D {
 
         this.scene.preRender.addEventListener(function () {
             if (resized) {
+                that.particleSystem.applyUserInput(that.panel.getUserInput());
                 that.particleSystem.canvasResize(that.scene.context);
                 resized = false;
                 that.scene.primitives.removeAll();

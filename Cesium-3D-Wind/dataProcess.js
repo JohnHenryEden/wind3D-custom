@@ -42,7 +42,6 @@ var DataProcess = (function () {
                     imageMeta.latArray.push(parseFloat(imageMeta.bottomlat) + (latUnit * index))
                 }
                 data.lon = {}
-                debugger
                 data.lon.array = new Float32Array(imageMeta.lonArray);
                 data.lon.min = parseFloat(imageMeta.leftlon);
                 data.lon.max = parseFloat(imageMeta.rightlon);
@@ -241,14 +240,20 @@ var DataProcess = (function () {
         }else{
             await loadUvImage(uvImageFilePath);
         }
+        
         return data;
     }
-
+    var getPixelRange = function(){
+        return {
+            lon: [data.lon.min, data.lon.max],
+            lat: [data.lat.min, data.lat.max],
+        }
+    }
     var randomizeParticles = function (maxParticles, viewerParameters) {
         var array = new Float32Array(4 * maxParticles);
         for (var i = 0; i < maxParticles; i++) {
-            array[4 * i] = Cesium.Math.randomBetween(viewerParameters.lonRange.x, viewerParameters.lonRange.y);
-            array[4 * i + 1] = Cesium.Math.randomBetween(viewerParameters.latRange.x, viewerParameters.latRange.y);
+            array[4 * i] = Cesium.Math.randomBetween(data ? data.lon.min: viewerParameters.lonRange.x, data ? data.lon.max:viewerParameters.lonRange.y);
+            array[4 * i + 1] = Cesium.Math.randomBetween(data ? data.lat.min : viewerParameters.latRange.x, data ? data.lat.max:viewerParameters.latRange.y);
             array[4 * i + 2] = Cesium.Math.randomBetween(data.lev.min, data.lev.max);
             array[4 * i + 3] = 0.0;
         }
@@ -257,6 +262,7 @@ var DataProcess = (function () {
 
     return {
         loadData: loadData,
+        getPixelRange: getPixelRange,
         randomizeParticles: randomizeParticles
     };
 

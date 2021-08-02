@@ -182,10 +182,22 @@ class ParticlesComputing {
                         return that.particlesTextures.particlesSpeed;
                     },
                     lonRange: function () {
-                        return viewerParameters.lonRange;
+                        let dataRange = DataProcess.getPixelRange().lon
+                        let visualRange = viewerParameters.lonRange
+                        if(visualRange.x > dataRange[0] || visualRange.y < dataRange[1]){
+                            return visualRange
+                        }else {
+                            return Cesium.Cartesian2.fromArray(DataProcess.getPixelRange().lon);
+                        }
                     },
                     latRange: function () {
-                        return viewerParameters.latRange;
+                        let dataRange = Cesium.Cartesian2.fromArray(DataProcess.getPixelRange().lat)
+                        let visualRange = viewerParameters.latRange
+                        if(visualRange.x > dataRange[0] || visualRange.y < dataRange[1]){
+                            return visualRange
+                        }else {
+                            return Cesium.Cartesian2.fromArray(DataProcess.getPixelRange().lat);
+                        }
                     },
                     randomCoefficient: function () {
                         var randomCoefficient = Math.random();
